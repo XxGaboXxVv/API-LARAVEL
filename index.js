@@ -1,17 +1,18 @@
 const mysql = require('mysql2');
 const express = require('express');
 const bp = require('body-parser');
+const moment = require('moment-timezone');
 
 
 var app = express();
 app.use(bp.json());
 
 var mysqlConnection = mysql.createConnection({
-    host: 'monorail.proxy.rlwy.net',
+    host: 'junction.proxy.rlwy.net',
     user: 'root',
-    password: 'vkrdPOhhIwrJuacKptvgdNMkQNnrTNUl',
+    password: 'KIrqtUpHbSvuQinLjxJIVrlxFZCqqxnl',
     database: 'railway',
-    port: 46905,
+    port: 17751,
     multipleStatements: true
 });
 
@@ -32,9 +33,19 @@ app.listen(3000, () => console.log('API REST corriendo en el puerto: 3000'));
 app.get('/SEL_ANUNCIOS_EVENTOS', (req, res) => {
     mysqlConnection.query('call SEL_TBL_ANUNCIOS_EVENTOS()', (err, rows, fields) => {
         if (!err) {
-            res.status(200).json(rows[0]);
+            // Asumiendo que tu zona horaria deseada es America/Tegucigalpa
+            const timezone = 'America/Tegucigalpa';
+            const convertedRows = rows[0].map(row => {
+                if (row.tuCampoDeFecha) {
+                    row.tuCampoDeFecha = moment.tz(row.FECHA_HORA, timezone).format();
+                }
+                return row;
+            });
+
+            res.status(200).json(convertedRows);
         } else {
             console.log(err);
+            res.status(500).send('Error ejecutando la consulta.');
         }
     });
 });
