@@ -33,11 +33,11 @@ app.listen(3000, () => console.log('API REST corriendo en el puerto: 3000'));
 app.get('/SEL_ANUNCIOS_EVENTOS', (req, res) => {
     mysqlConnection.query('call SEL_TBL_ANUNCIOS_EVENTOS()', (err, rows, fields) => {
         if (!err) {
-            // Asumiendo que tu zona horaria deseada es America/Tegucigalpa
-            const timezone = 'America/Tegucigalpa';
+            // Convertir todas las fechas a CST antes de enviar la respuesta
             const convertedRows = rows[0].map(row => {
-                if (row.tuCampoDeFecha) {
-                    row.tuCampoDeFecha = moment.tz(row.FECHA_HORA, timezone).format();
+                if (row.fecha) { // Reemplaza 'fecha' con el nombre correcto del campo en tu base de datos
+                    // Convierte de UTC a CST
+                    row.fecha = moment.utc(row.FECHA_HORA).tz('America/Chicago').format('YYYY-MM-DD HH:mm:ss');
                 }
                 return row;
             });
