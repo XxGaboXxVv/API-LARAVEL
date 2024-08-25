@@ -3,108 +3,86 @@ const express = require('express');
 const bp = require('body-parser');
 const moment = require('moment-timezone');
 
-
 var app = express();
 app.use(bp.json());
 
-var mysqlConnection = mysql.createConnection({
+// Crear un pool de conexiones
+const pool = mysql.createPool({
     host: 'srv1059.hstgr.io',
     user: 'u729991132_root',
     password: 'Dragonb@ll2',
     database: 'u729991132_railway',
     port: 3306,
-    multipleStatements: true
+    waitForConnections: true,
+    connectionLimit: 10, // Número máximo de conexiones en el pool
+    queueLimit: 0
 });
 
-mysqlConnection.connect((err) => {
-    if (!err) {
-        console.log('Conexión Exitosa');
-    } else {
-        console.error('Error al conectar a la DB:', err.code, err.message, err.stack);
+// Promisificar las consultas para usar async/await
+const promisePool = pool.promise();
+
+// Endpoint para obtener anuncios y eventos
+app.get('/SEL_ANUNCIOS_EVENTOS', async (req, res) => {
+    try {
+        const [rows] = await promisePool.query('CALL SEL_TBL_ANUNCIOS_EVENTOS()');
+        // Convertir todas las fechas a CST antes de enviar la respuesta
+        const convertedRows = rows.map(row => {
+            if (row.fecha) { // Reemplaza 'fecha' con el nombre correcto del campo en tu base de datos
+                // Convierte de UTC a CST
+                row.fecha = moment.utc(row.FECHA_HORA).tz('America/Chicago').format('YYYY-MM-DD HH:mm:ss');
+            }
+            return row;
+        });
+
+        res.status(200).json(convertedRows);
+    } catch (err) {
+        console.error('Error ejecutando la consulta:', err);
+        res.status(500).send('Error ejecutando la consulta.');
     }
 });
 
-app.listen(3000, () => console.log('API REST corriendo en el puerto: 3000'));
+// Endpoint para insertar un anuncio o evento
+app.post('/POST_ANUNCIOS_EVENTOS', async (req, res) => {
+    const { P_TITULO, P_ID_ESTADO_ANUNCIO_EVENTO, P_DESCRIPCION, P_IMAGEN, P_FECHA_HORA } = req.body;
 
-
-//http://localhost:3000/
-
-//Select <-> Get ANUNCIOS  con Procedimiento almacenado
-app.get('/SEL_ANUNCIOS_EVENTOS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_ANUNCIOS_EVENTOS()', (err, rows, fields) => {
-        if (!err) {
-            // Convertir todas las fechas a CST antes de enviar la respuesta
-            const convertedRows = rows[0].map(row => {
-                if (row.fecha) { // Reemplaza 'fecha' con el nombre correcto del campo en tu base de datos
-                    // Convierte de UTC a CST
-                    row.fecha = moment.utc(row.FECHA_HORA).tz('America/Chicago').format('YYYY-MM-DD HH:mm:ss');
-                }
-                return row;
-            });
-
-            res.status(200).json(convertedRows);
-        } else {
-            console.log(err);
-            res.status(500).send('Error ejecutando la consulta.');
-        }
-    });
+    try {
+        await promisePool.query("CALL INS_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?)", [
+            P_TITULO,
+            P_ID_ESTADO_ANUNCIO_EVENTO,
+            P_DESCRIPCION,
+            P_IMAGEN,
+            P_FECHA_HORA,
+        ]);
+        res.send("Ingresado correctamente !!");
+    } catch (err) {
+        console.error('Error ejecutando la inserción:', err);
+        res.status(500).send('Error ejecutando la inserción.');
+    }
 });
 
-// insertar a la tabla ANUNCIOS
-app.post('/POST_ANUNCIOS_EVENTOS', (req, res) => {
-    const {
-        P_TITULO,
-        P_ID_ESTADO_ANUNCIO_EVENTO,
-        P_DESCRIPCION,
-        P_IMAGEN,
-        P_FECHA_HORA
-    } = req.body;
-
-    mysqlConnection.query("CALL INS_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?)", [
-        P_TITULO,
-        P_ID_ESTADO_ANUNCIO_EVENTO,
-        P_DESCRIPCION,
-        P_IMAGEN,
-        P_FECHA_HORA,
-        ], (err, rows, fields) => {
-
-        if (!err) {
-            res.send("Ingresado correctamente !!");
-        } else {
-            console.log(err);
-        }
-    });
-});
-
-
-//Delete de la tabla *** TIPO_PERSONAS ***
-app.post('/DEL_ANUNCIOS_EVENTOS', (req, res) => {
+// Endpoint para eliminar un anuncio o evento
+app.post('/DEL_ANUNCIOS_EVENTOS', async (req, res) => {
     const { P_ID_ANUNCIOS_EVENTOS } = req.body;
 
-    mysqlConnection.query(
-        "CALL DEL_TBL_ANUNCIOS_EVENTOS(?)",
-        [P_ID_ANUNCIOS_EVENTOS],
-        (err, rows, fields) => {
-            if (!err) {
-                res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
-            } else {
-                if (err.code === 'ER_ROW_IS_REFERENCED_2') {
-                    res.status(400).json({
-                        error: 'No se puede eliminar el Anuncio porque está relacionado con otros registros.'
-                    });
-                } else {
-                    res.status(500).json({
-                        error: 'Ocurrió un error al intentar eliminar el Anuncio.'
-                    });
-                }
-                console.log(err);
-            }
+    try {
+        await promisePool.query("CALL DEL_TBL_ANUNCIOS_EVENTOS(?)", [P_ID_ANUNCIOS_EVENTOS]);
+        res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
+    } catch (err) {
+        if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+            res.status(400).json({
+                error: 'No se puede eliminar el Anuncio porque está relacionado con otros registros.'
+            });
+        } else {
+            console.error('Error ejecutando la eliminación:', err);
+            res.status(500).json({
+                error: 'Ocurrió un error al intentar eliminar el Anuncio.'
+            });
         }
-    );
+    }
 });
 
-// ACTUALIZAR a la tabla *** TIPO_PERSONAS ***
-app.post('/PUT_ANUNCIOS_EVENTOS', (req, res) => {
+// Endpoint para actualizar un anuncio o evento
+app.post('/PUT_ANUNCIOS_EVENTOS', async (req, res) => {
     const {
         P_ID_ANUNCIOS_EVENTOS,
         P_ID_ESTADO_ANUNCIO_EVENTO,
@@ -112,26 +90,26 @@ app.post('/PUT_ANUNCIOS_EVENTOS', (req, res) => {
         P_DESCRIPCION,
         P_IMAGEN,
         P_FECHA_HORA,
-        
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?,?)", [  
-        P_ID_ANUNCIOS_EVENTOS,
-        P_ID_ESTADO_ANUNCIO_EVENTO,
-        P_TITULO,
-        P_DESCRIPCION,
-        P_IMAGEN,
-        P_FECHA_HORA,
-        
-    ], (err, rows, fields) => {
-
-        if (!err) {
-            res.send("Actualizado correctamente !!");
-        } else {
-            console.log(err);
-        }
-    });
+    try {
+        await promisePool.query("CALL UPD_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?,?)", [
+            P_ID_ANUNCIOS_EVENTOS,
+            P_ID_ESTADO_ANUNCIO_EVENTO,
+            P_TITULO,
+            P_DESCRIPCION,
+            P_IMAGEN,
+            P_FECHA_HORA,
+        ]);
+        res.send("Actualizado correctamente !!");
+    } catch (err) {
+        console.error('Error ejecutando la actualización:', err);
+        res.status(500).send('Error ejecutando la actualización.');
+    }
 });
+
+// Iniciar el servidor
+app.listen(3000, () => console.log('API REST corriendo en el puerto: 3000'));
 
 //SELVIN 
 //  ***TABLA PERSONA ***
