@@ -8,7 +8,7 @@ var app = express();
 app.use(bp.json());
 
 var mysqlConnection = mysql.createConnection({
-    host: '127.0.0.1',
+    host: 'srv1059.hstgr.io',
     user: 'u729991132_root',
     password: 'Dragonb@ll2',
     database: 'u729991132_railway',
