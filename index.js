@@ -239,79 +239,62 @@ app.post('/PUT_PERSONA', async (req, res) => {
 
 //Tablas *** TIPO_PERSONAS ***
 
-//Select <-> Get TIPO_PERSONAS con Procedimiento almacenado
-app.get('/SEL_TBL_TIPO_PERSONAS', (req, res) => {
-    pool.query('call SEL_TBL_TIPO_PERSONAS()', (err, rows, fields) => {
-        if (!err) {
-            res.status(200).json(rows[0]);
-        } else {
-            console.log(err);
-        }
-    });
+// Select <-> Get TIPO_PERSONAS con Procedimiento almacenado
+app.get('/SEL_TBL_TIPO_PERSONAS', async (req, res) => {
+    try {
+        const rows = await queryAsync('CALL SEL_TBL_TIPO_PERSONAS()');
+        res.status(200).json(rows[0]);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: 'Ocurrió un error al obtener los tipos de personas.' });
+    }
 });
 
-// insertar a la tabla TIPO_PERSONAS
-app.post('/POST_TBL_TIPO_PERSONAS', (req, res) => {
-    const {
-        P_DESCRIPCION,
-    } = req.body;
+// Insertar a la tabla TIPO_PERSONAS
+app.post('/POST_TBL_TIPO_PERSONAS', async (req, res) => {
+    const { P_DESCRIPCION } = req.body;
 
-    pool.query("CALL INS_TBL_TIPO_PERSONAS (?)", [
-         P_DESCRIPCION,
-        ], (err, rows, fields) => {
-
-        if (!err) {
-            res.send("Ingresado correctamente !!");
-        } else {
-            console.log(err);
-        }
-    });
+    try {
+        await queryAsync('CALL INS_TBL_TIPO_PERSONAS(?)', [P_DESCRIPCION]);
+        res.send('Ingresado correctamente !!');
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: 'Ocurrió un error al insertar el tipo de persona.' });
+    }
 });
 
-
-//Delete de la tabla *** TIPO_PERSONAS ***
-app.post('/DEL_TBL_TIPO_PERSONAS', (req, res) => {
+// Delete de la tabla TIPO_PERSONAS
+app.post('/DEL_TBL_TIPO_PERSONAS', async (req, res) => {
     const { P_ID_TIPO_PERSONA } = req.body;
 
-    pool.query(
-        "CALL DEL_TBL_TIPO_PERSONAS(?)",
-        [P_ID_TIPO_PERSONA],
-        (err, rows, fields) => {
-            if (!err) {
-                res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
-            } else {
-                if (err.code === 'ER_ROW_IS_REFERENCED_2') {
-                    res.status(400).json({
-                        error: 'No se puede eliminar el Tipo de Persona porque está relacionado con otros registros.'
-                    });
-                } else {
-                    res.status(500).json({
-                        error: 'Ocurrió un error al intentar eliminar el Tipo de Persona.'
-                    });
-                }
-                console.log(err);
-            }
+    try {
+        await queryAsync('CALL DEL_TBL_TIPO_PERSONAS(?)', [P_ID_TIPO_PERSONA]);
+        res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
+    } catch (err) {
+        console.log(err);
+        if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+            res.status(400).json({
+                error: 'No se puede eliminar el Tipo de Persona porque está relacionado con otros registros.'
+            });
+        } else {
+            res.status(500).json({
+                error: 'Ocurrió un error al intentar eliminar el Tipo de Persona.'
+            });
         }
-    );
+    }
 });
 
-// ACTUALIZAR a la tabla *** TIPO_PERSONAS ***
-app.post('/PUT_TBL_TIPO_PERSONAS', (req, res) => {
-    const {
-        P_ID_TIPO_PERSONA,
-        P_DESCRIPCION
-    } = req.body;
+// Actualizar a la tabla TIPO_PERSONAS
+app.post('/PUT_TBL_TIPO_PERSONAS', async (req, res) => {
+    const { P_ID_TIPO_PERSONA, P_DESCRIPCION } = req.body;
 
-    pool.query("CALL UPD_TBL_TIPO_PERSONAS (?,?)", [ P_ID_TIPO_PERSONA,
-        P_DESCRIPCION,
-    ], (err, rows, fields) => {
-
-        if (!err) {
-            res.send("Actualizado correctamente !!");
-        } else {
-            console.log(err);
-        }
-    });
+    try {
+        await queryAsync('CALL UPD_TBL_TIPO_PERSONAS(?, ?)', [P_ID_TIPO_PERSONA, P_DESCRIPCION]);
+        res.send('Actualizado correctamente !!');
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: 'Ocurrió un error al actualizar el tipo de persona.' });
+    }
 });
 
 
