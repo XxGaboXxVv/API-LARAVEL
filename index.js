@@ -1156,19 +1156,19 @@ app.post('/PUT_CONTACTOS', (req, res) => {
 
 //  ***TABLA USUARIO ***
 
-//Select <-> Get USUARIO con Procedimiento almacenado
-app.get('/SEL_USUARIO', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_MS_USUARIO()', (err, rows, fields) => {
-        if (!err) {
-            res.status(200).json(rows[0]);
-        } else {
-            console.log(err);
-        }
-    });
+// Select <-> Get USUARIO con Procedimiento almacenado
+app.get('/SEL_USUARIO', async (req, res) => {
+    try {
+        const [rows, fields] = await promisePool.query('CALL SEL_TBL_MS_USUARIO()');
+        res.status(200).json(rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error al obtener los usuarios.' });
+    }
 });
 
-// insertar a la tabla USUARIO
-app.post('/POST_USUARIO', (req, res) => {
+// Insertar a la tabla USUARIO
+app.post('/POST_USUARIO', async (req, res) => {
     const {
         ID_ROL,
         NOMBRE_USUARIO,
@@ -1178,16 +1178,31 @@ app.post('/POST_USUARIO', (req, res) => {
         PRIMER_INGRESO,
         FECHA_ULTIMA_CONEXION,
         FECHA_VENCIMIENTO,
-        google_id,
         google2fa_secret,
         INTENTOS_FALLIDOS,
         INTENTOS_FALLIDOS_OTP,
         ULTIMOS_INTENTOS_FALLIDOS
     } = req.body;
 
-    mysqlConnection.query(
-        "CALL INS_TBL_MS_USUARIO(?,?,?,?,?,?,?,?,?,?,?,?)",
-        [
+    try {
+        const [result] = await promisePool.query(
+            "CALL INS_TBL_MS_USUARIO(?,?,?,?,?,?,?,?,?,?,?,?)", [
+                ID_ROL,
+                NOMBRE_USUARIO,
+                ID_ESTADO_USUARIO,
+                EMAIL,
+                CONTRASEÑA,
+                PRIMER_INGRESO,
+                FECHA_ULTIMA_CONEXION,
+                FECHA_VENCIMIENTO,
+                google2fa_secret,
+                INTENTOS_FALLIDOS,
+                INTENTOS_FALLIDOS_OTP,
+                ULTIMOS_INTENTOS_FALLIDOS
+            ]
+        );
+
+        const newUser = {
             ID_ROL,
             NOMBRE_USUARIO,
             ID_ESTADO_USUARIO,
@@ -1199,66 +1214,40 @@ app.post('/POST_USUARIO', (req, res) => {
             google2fa_secret,
             INTENTOS_FALLIDOS,
             INTENTOS_FALLIDOS_OTP,
-            ULTIMOS_INTENTOS_FALLIDOS
-        ],
-        (err, filas, campos) => {
-            if (!err) {
-                // Define el objeto `newUser` con los datos del usuario recién creado
-                const newUser = {
-                    ID_ROL,
-                    NOMBRE_USUARIO,
-                    ID_ESTADO_USUARIO,
-                    EMAIL,
-                    CONTRASEÑA,
-                    PRIMER_INGRESO,
-                    FECHA_ULTIMA_CONEXION,
-                    FECHA_VENCIMIENTO,
-                    google2fa_secret,
-                    INTENTOS_FALLIDOS,
-                    INTENTOS_FALLIDOS_OTP,
-                    ULTIMOS_INTENTOS_FALLIDOS,
-                    ID_USUARIO: filas.insertId // O cualquier manera de obtener el ID_USUARIO creado
-                };
-                res.status(201).json(newUser);  // Envía la respuesta con los detalles del nuevo usuario
-            } else {
-                console.log(err);
-                res.status(500).send("Error al ingresar los datos");
-            }
-        }
-    );
+            ULTIMOS_INTENTOS_FALLIDOS,
+            ID_USUARIO: result.insertId // O cualquier manera de obtener el ID_USUARIO creado
+        };
+
+        res.status(201).json(newUser);  // Envía la respuesta con los detalles del nuevo usuario
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Error al ingresar los datos del usuario." });
+    }
 });
-
-
-
 
 // Borrar a la tabla USUARIO
-app.post('/DEL_USUARIO', (req, res) => {
+app.post('/DEL_USUARIO', async (req, res) => {
     const { P_ID_USUARIO } = req.body;
 
-    mysqlConnection.query(
-        "CALL DEL_TBL_MS_USUARIO(?)",
-        [P_ID_USUARIO],
-        (err, rows, fields) => {
-            if (!err) {
-                res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
-            } else {
-                if (err.code === 'ER_ROW_IS_REFERENCED_2') {
-                    res.status(400).json({
-                        error: 'No se puede eliminar el Usuario porque está relacionado con otros registros.'
-                    });
-                } else {
-                    res.status(500).json({
-                        error: 'Ocurrió un error al intentar eliminar el Usuario.'
-                    });
-                }
-                console.log(err);
-            }
+    try {
+        const [rows, fields] = await promisePool.query("CALL DEL_TBL_MS_USUARIO(?)", [P_ID_USUARIO]);
+        res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
+    } catch (err) {
+        if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+            res.status(400).json({
+                error: 'No se puede eliminar el Usuario porque está relacionado con otros registros.'
+            });
+        } else {
+            res.status(500).json({
+                error: 'Ocurrió un error al intentar eliminar el Usuario.'
+            });
         }
-    );
+        console.error(err);
+    }
 });
 
-// ACTUALIZAR a la tabla USUARIO
-app.post('/PUT_USUARIO', (req, res) => {
+// Actualizar la tabla USUARIO
+app.post('/PUT_USUARIO', async (req, res) => {
     const {
         P_ID_USUARIO,
         P_ID_ROL,
@@ -1275,31 +1264,32 @@ app.post('/PUT_USUARIO', (req, res) => {
         P_ULTIMOS_INTENTOS_FALLIDOS
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_MS_USUARIO (?,?,?,?,?,?,?,?,?,?,?,?,?)", [
-        P_ID_USUARIO,
-        P_ID_ROL,
-        P_NOMBRE_USUARIO,
-        P_ID_ESTADO_USUARIO,
-        P_EMAIL,
-        P_CONTRASEÑA,
-        P_PRIMER_INGRESO,
-        P_FECHA_ULTIMA_CONEXION,
-        P_FECHA_VENCIMIENTO,
-        P_google2fa_secret,
-        P_INTENTOS_FALLIDOS,
-        P_INTENTOS_FALLIDOS_OTP,
-        P_ULTIMOS_INTENTOS_FALLIDOS
-    ], (err, rows, fields) => {
-        if (!err) {
-            res.send("Actualizado correctamente !!");
+    try {
+        const [rows, fields] = await promisePool.query("CALL UPD_TBL_MS_USUARIO (?,?,?,?,?,?,?,?,?,?,?,?,?)", [
+            P_ID_USUARIO,
+            P_ID_ROL,
+            P_NOMBRE_USUARIO,
+            P_ID_ESTADO_USUARIO,
+            P_EMAIL,
+            P_CONTRASEÑA,
+            P_PRIMER_INGRESO,
+            P_FECHA_ULTIMA_CONEXION,
+            P_FECHA_VENCIMIENTO,
+            P_google2fa_secret,
+            P_INTENTOS_FALLIDOS,
+            P_INTENTOS_FALLIDOS_OTP,
+            P_ULTIMOS_INTENTOS_FALLIDOS
+        ]);
+
+        res.send("Actualizado correctamente !!");
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+            res.status(409).json({ message: 'El correo electrónico ingresado ya ha sido registrado.' });
         } else {
-            if (err.code === 'ER_DUP_ENTRY') {
-                return res.status(409).json({ message: 'El correo electrónico ingresado ya ha sido registrado.' });
-            }
-            console.log(err);
+            console.error(err);
             res.status(500).json({ message: 'Error al actualizar Usuario.' });
         }
-    });
+    }
 });
 
 
