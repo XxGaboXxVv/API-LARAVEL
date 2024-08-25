@@ -8,7 +8,7 @@ var app = express();
 app.use(bp.json());
 
 
-const mysqlPool = mysql.createPool({
+const pool = mysql.createPool({
 
      host:'srv1059.hstgr.io',
     user:'u729991132_root',
