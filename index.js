@@ -141,10 +141,10 @@ app.post('/PUT_ANUNCIOS_EVENTOS', async (req, res) => {
 //SELVIN 
 //  ***TABLA PERSONA ***
 
-//Select <-> Get PERSONAS con Procedimiento almacenado
+// Select <-> Get PERSONAS con Procedimiento almacenado
 app.get('/SEL_PERSONA', async (req, res) => {
     try {
-        const rows = await queryAsync('CALL SEL_TBL_PERSONA()');
+        const [rows, fields] = await pool.query('CALL SEL_TBL_PERSONA()');
         res.status(200).json(rows[0]);
     } catch (err) {
         console.log(err);
@@ -166,7 +166,22 @@ app.post('/POST_PERSONA', async (req, res) => {
     } = req.body;
 
     try {
-        await queryAsync("CALL INS_TBL_PERSONA(?,?,?,?,?,?,?,?)", [
+        const [rows, fields] = await pool.query(
+            "CALL INS_TBL_PERSONA(?,?,?,?,?,?,?,?)",
+            [
+                P_NOMBRE_PERSONA,
+                P_DNI_PERSONA,
+                P_ID_CONTACTO,
+                P_ID_TIPO_PERSONA,
+                P_ID_ESTADO_PERSONA,
+                P_ID_PARENTESCO,
+                P_ID_CONDOMINIO,
+                P_ID_PADRE,
+            ]
+        );
+
+        // Define el objeto `newPersona` con los datos de la persona recién creada
+        const newPersona = {
             P_NOMBRE_PERSONA,
             P_DNI_PERSONA,
             P_ID_CONTACTO,
@@ -175,8 +190,10 @@ app.post('/POST_PERSONA', async (req, res) => {
             P_ID_PARENTESCO,
             P_ID_CONDOMINIO,
             P_ID_PADRE,
-        ]);
-        res.send("Ingresado correctamente !!");
+            ID_PERSONA: rows.insertId // O cualquier manera de obtener el ID_PERSONA creado
+        };
+
+        res.status(201).json(newPersona);  // Envía la respuesta con los detalles de la nueva persona
     } catch (err) {
         console.log(err);
         res.status(500).json({ error: 'Ocurrió un error al insertar la persona.' });
@@ -188,7 +205,7 @@ app.post('/DEL_PERSONA', async (req, res) => {
     const { P_ID_PERSONA } = req.body;
 
     try {
-        await queryAsync("CALL DEL_TBL_PERSONA(?)", [P_ID_PERSONA]);
+        await pool.query("CALL DEL_TBL_PERSONA(?)", [P_ID_PERSONA]);
         res.status(200).json({ message: 'Residente eliminado con éxito.' });
     } catch (err) {
         console.log(err);
@@ -219,23 +236,28 @@ app.post('/PUT_PERSONA', async (req, res) => {
     } = req.body;
 
     try {
-        await queryAsync("CALL UPD_TBL_PERSONA(?,?,?,?,?,?,?,?,?)", [
-            P_ID_PERSONA,
-            P_NOMBRE_PERSONA,
-            P_DNI_PERSONA,
-            P_ID_CONTACTO,
-            P_ID_TIPO_PERSONA,
-            P_ID_ESTADO_PERSONA,
-            P_ID_PARENTESCO,
-            P_ID_CONDOMINIO,
-            P_ID_PADRE
-        ]);
+        await pool.query(
+            "CALL UPD_TBL_PERSONA(?,?,?,?,?,?,?,?,?)",
+            [
+                P_ID_PERSONA,
+                P_NOMBRE_PERSONA,
+                P_DNI_PERSONA,
+                P_ID_CONTACTO,
+                P_ID_TIPO_PERSONA,
+                P_ID_ESTADO_PERSONA,
+                P_ID_PARENTESCO,
+                P_ID_CONDOMINIO,
+                P_ID_PADRE
+            ]
+        );
+
         res.send("Actualizado correctamente !!");
     } catch (err) {
         console.log(err);
         res.status(500).json({ error: 'Ocurrió un error al actualizar la persona.' });
     }
 });
+
 
 //Tablas *** TIPO_PERSONAS ***
 
