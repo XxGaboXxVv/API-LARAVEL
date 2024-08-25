@@ -41,28 +41,28 @@ app.listen(3000, () => console.log('API REST corriendo en el puerto: 3000'));
 //http://localhost:3000/
 
 //Select <-> Get ANUNCIOS  con Procedimiento almacenado
-app.get('/SEL_ANUNCIOS_EVENTOS', (req, res) => {
-    pool.query('call SEL_TBL_ANUNCIOS_EVENTOS()', (err, rows, fields) => {
-        if (!err) {
-            // Asumiendo que tu zona horaria deseada es America/Tegucigalpa
-            const timezone = 'America/Tegucigalpa';
-            const convertedRows = rows[0].map(row => {
-                if (row.tuCampoDeFecha) {
-                    row.tuCampoDeFecha = moment.tz(row.FECHA_HORA, timezone).format();
-                }
-                return row;
-            });
+app.get('/SEL_ANUNCIOS_EVENTOS', async (req, res) => {
+    try {
+        const [rows, fields] = await pool.query('CALL SEL_TBL_ANUNCIOS_EVENTOS()');
+        
+        // Asumiendo que tu zona horaria deseada es America/Tegucigalpa
+        const timezone = 'America/Tegucigalpa';
+        const convertedRows = rows[0].map(row => {
+            if (row.tuCampoDeFecha) {
+                row.tuCampoDeFecha = moment.tz(row.FECHA_HORA, timezone).format();
+            }
+            return row;
+        });
 
-            res.status(200).json(convertedRows);
-        } else {
-            console.log(err);
-            res.status(500).send('Error ejecutando la consulta.');
-        }
-    });
+        res.status(200).json(convertedRows);
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Error ejecutando la consulta.');
+    }
 });
 
 // insertar a la tabla ANUNCIOS
-app.post('/POST_ANUNCIOS_EVENTOS', (req, res) => {
+app.post('/POST_ANUNCIOS_EVENTOS', async (req, res) => {
     const {
         P_TITULO,
         P_ID_ESTADO_ANUNCIO_EVENTO,
@@ -71,51 +71,46 @@ app.post('/POST_ANUNCIOS_EVENTOS', (req, res) => {
         P_FECHA_HORA
     } = req.body;
 
-    pool.query("CALL INS_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?)", [
-        P_TITULO,
-        P_ID_ESTADO_ANUNCIO_EVENTO,
-        P_DESCRIPCION,
-        P_IMAGEN,
-        P_FECHA_HORA,
-        ], (err, rows, fields) => {
-
-        if (!err) {
-            res.send("Ingresado correctamente !!");
-        } else {
-            console.log(err);
-        }
-    });
+    try {
+        const [rows, fields] = await pool.query("CALL INS_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?)", [
+            P_TITULO,
+            P_ID_ESTADO_ANUNCIO_EVENTO,
+            P_DESCRIPCION,
+            P_IMAGEN,
+            P_FECHA_HORA
+        ]);
+        
+        res.send("Ingresado correctamente !!");
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Error ejecutando la consulta.');
+    }
 });
 
 
 //Delete de la tabla *** TIPO_PERSONAS ***
-app.post('/DEL_ANUNCIOS_EVENTOS', (req, res) => {
+app.post('/DEL_ANUNCIOS_EVENTOS', async (req, res) => {
     const { P_ID_ANUNCIOS_EVENTOS } = req.body;
 
-    pool.query(
-        "CALL DEL_TBL_ANUNCIOS_EVENTOS(?)",
-        [P_ID_ANUNCIOS_EVENTOS],
-        (err, rows, fields) => {
-            if (!err) {
-                res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
-            } else {
-                if (err.code === 'ER_ROW_IS_REFERENCED_2') {
-                    res.status(400).json({
-                        error: 'No se puede eliminar el Anuncio porque está relacionado con otros registros.'
-                    });
-                } else {
-                    res.status(500).json({
-                        error: 'Ocurrió un error al intentar eliminar el Anuncio.'
-                    });
-                }
-                console.log(err);
-            }
+    try {
+        const [rows, fields] = await pool.query("CALL DEL_TBL_ANUNCIOS_EVENTOS(?)", [P_ID_ANUNCIOS_EVENTOS]);
+        
+        res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
+    } catch (err) {
+        if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+            res.status(400).json({
+                error: 'No se puede eliminar el Anuncio porque está relacionado con otros registros.'
+            });
+        } else {
+            res.status(500).json({
+                error: 'Ocurrió un error al intentar eliminar el Anuncio.'
+            });
         }
-    );
+        console.log(err);
+    }
 });
 
-// ACTUALIZAR a la tabla *** TIPO_PERSONAS ***
-app.post('/PUT_ANUNCIOS_EVENTOS', (req, res) => {
+app.post('/PUT_ANUNCIOS_EVENTOS', async (req, res) => {
     const {
         P_ID_ANUNCIOS_EVENTOS,
         P_ID_ESTADO_ANUNCIO_EVENTO,
@@ -123,26 +118,25 @@ app.post('/PUT_ANUNCIOS_EVENTOS', (req, res) => {
         P_DESCRIPCION,
         P_IMAGEN,
         P_FECHA_HORA,
-        
     } = req.body;
 
-    pool.query("CALL UPD_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?,?)", [  
-        P_ID_ANUNCIOS_EVENTOS,
-        P_ID_ESTADO_ANUNCIO_EVENTO,
-        P_TITULO,
-        P_DESCRIPCION,
-        P_IMAGEN,
-        P_FECHA_HORA,
-        
-    ], (err, rows, fields) => {
+    try {
+        const [rows, fields] = await pool.query("CALL UPD_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?,?)", [
+            P_ID_ANUNCIOS_EVENTOS,
+            P_ID_ESTADO_ANUNCIO_EVENTO,
+            P_TITULO,
+            P_DESCRIPCION,
+            P_IMAGEN,
+            P_FECHA_HORA,
+        ]);
 
-        if (!err) {
-            res.send("Actualizado correctamente !!");
-        } else {
-            console.log(err);
-        }
-    });
+        res.send("Actualizado correctamente !!");
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Error ejecutando la consulta.');
+    }
 });
+
 
 //SELVIN 
 //  ***TABLA PERSONA ***
