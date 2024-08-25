@@ -1,88 +1,121 @@
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 const express = require('express');
 const bp = require('body-parser');
 const moment = require('moment-timezone');
 
+
 var app = express();
 app.use(bp.json());
 
-// Crear un pool de conexiones
+
 const pool = mysql.createPool({
-    host: 'srv1059.hstgr.io',
-    user: 'u729991132_root',
-    password: 'Dragonb@ll2',
-    database: 'u729991132_railway',
-    port: 3306,
-    waitForConnections: true,
-    connectionLimit: 10, // Número máximo de conexiones en el pool
-    queueLimit: 0
+
+     host:'srv1059.hstgr.io',
+    user:'u729991132_root',
+    password:'Dragonb@ll2',
+    database:'u729991132_railway',
+    port:3306,
+    multipleStatements: true
 });
 
-// Promisificar las consultas para usar async/await
-const promisePool = pool.promise();
 
-// Endpoint para obtener anuncios y eventos
-app.get('/SEL_ANUNCIOS_EVENTOS', async (req, res) => {
-    try {
-        const [rows] = await promisePool.query('CALL SEL_TBL_ANUNCIOS_EVENTOS()');
-        // Convertir todas las fechas a CST antes de enviar la respuesta
-        const convertedRows = rows.map(row => {
-            if (row.fecha) { // Reemplaza 'fecha' con el nombre correcto del campo en tu base de datos
-                // Convierte de UTC a CST
-                row.fecha = moment.utc(row.FECHA_HORA).tz('America/Chicago').format('YYYY-MM-DD HH:mm:ss');
-            }
-            return row;
-        });
+pool.getConnection()
+    .then(connection => {
+        console.log('Conexión establecida exitosamente.');
+        connection.release();
+    })
+    .catch(err => {
+        console.error('Error en la conexión a la base de datos:', err);
+    
 
-        res.status(200).json(convertedRows);
-    } catch (err) {
-        console.error('Error ejecutando la consulta:', err);
-        res.status(500).send('Error ejecutando la consulta.');
+    if (!err) {
+        console.log('Conexión Exitosa');
+    } else {
+        console.error('Error al conectar a la DB:', err.code, err.message, err.stack);
     }
 });
 
-// Endpoint para insertar un anuncio o evento
-app.post('/POST_ANUNCIOS_EVENTOS', async (req, res) => {
-    const { P_TITULO, P_ID_ESTADO_ANUNCIO_EVENTO, P_DESCRIPCION, P_IMAGEN, P_FECHA_HORA } = req.body;
+app.listen(3000, () => console.log('API REST corriendo en el puerto: 3000'));
 
-    try {
-        await promisePool.query("CALL INS_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?)", [
-            P_TITULO,
-            P_ID_ESTADO_ANUNCIO_EVENTO,
-            P_DESCRIPCION,
-            P_IMAGEN,
-            P_FECHA_HORA,
-        ]);
-        res.send("Ingresado correctamente !!");
-    } catch (err) {
-        console.error('Error ejecutando la inserción:', err);
-        res.status(500).send('Error ejecutando la inserción.');
-    }
+
+//http://localhost:3000/
+
+//Select <-> Get ANUNCIOS  con Procedimiento almacenado
+app.get('/SEL_ANUNCIOS_EVENTOS', (req, res) => {
+    pool.query('call SEL_TBL_ANUNCIOS_EVENTOS()', (err, rows, fields) => {
+        if (!err) {
+            // Asumiendo que tu zona horaria deseada es America/Tegucigalpa
+            const timezone = 'America/Tegucigalpa';
+            const convertedRows = rows[0].map(row => {
+                if (row.tuCampoDeFecha) {
+                    row.tuCampoDeFecha = moment.tz(row.FECHA_HORA, timezone).format();
+                }
+                return row;
+            });
+
+            res.status(200).json(convertedRows);
+        } else {
+            console.log(err);
+            res.status(500).send('Error ejecutando la consulta.');
+        }
+    });
 });
 
-// Endpoint para eliminar un anuncio o evento
-app.post('/DEL_ANUNCIOS_EVENTOS', async (req, res) => {
+// insertar a la tabla ANUNCIOS
+app.post('/POST_ANUNCIOS_EVENTOS', (req, res) => {
+    const {
+        P_TITULO,
+        P_ID_ESTADO_ANUNCIO_EVENTO,
+        P_DESCRIPCION,
+        P_IMAGEN,
+        P_FECHA_HORA
+    } = req.body;
+
+    pool.query("CALL INS_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?)", [
+        P_TITULO,
+        P_ID_ESTADO_ANUNCIO_EVENTO,
+        P_DESCRIPCION,
+        P_IMAGEN,
+        P_FECHA_HORA,
+        ], (err, rows, fields) => {
+
+        if (!err) {
+            res.send("Ingresado correctamente !!");
+        } else {
+            console.log(err);
+        }
+    });
+});
+
+
+//Delete de la tabla *** TIPO_PERSONAS ***
+app.post('/DEL_ANUNCIOS_EVENTOS', (req, res) => {
     const { P_ID_ANUNCIOS_EVENTOS } = req.body;
 
-    try {
-        await promisePool.query("CALL DEL_TBL_ANUNCIOS_EVENTOS(?)", [P_ID_ANUNCIOS_EVENTOS]);
-        res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
-    } catch (err) {
-        if (err.code === 'ER_ROW_IS_REFERENCED_2') {
-            res.status(400).json({
-                error: 'No se puede eliminar el Anuncio porque está relacionado con otros registros.'
-            });
-        } else {
-            console.error('Error ejecutando la eliminación:', err);
-            res.status(500).json({
-                error: 'Ocurrió un error al intentar eliminar el Anuncio.'
-            });
+    pool.query(
+        "CALL DEL_TBL_ANUNCIOS_EVENTOS(?)",
+        [P_ID_ANUNCIOS_EVENTOS],
+        (err, rows, fields) => {
+            if (!err) {
+                res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
+            } else {
+                if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+                    res.status(400).json({
+                        error: 'No se puede eliminar el Anuncio porque está relacionado con otros registros.'
+                    });
+                } else {
+                    res.status(500).json({
+                        error: 'Ocurrió un error al intentar eliminar el Anuncio.'
+                    });
+                }
+                console.log(err);
+            }
         }
-    }
+    );
 });
 
-// Endpoint para actualizar un anuncio o evento
-app.post('/PUT_ANUNCIOS_EVENTOS', async (req, res) => {
+// ACTUALIZAR a la tabla *** TIPO_PERSONAS ***
+app.post('/PUT_ANUNCIOS_EVENTOS', (req, res) => {
     const {
         P_ID_ANUNCIOS_EVENTOS,
         P_ID_ESTADO_ANUNCIO_EVENTO,
@@ -90,33 +123,33 @@ app.post('/PUT_ANUNCIOS_EVENTOS', async (req, res) => {
         P_DESCRIPCION,
         P_IMAGEN,
         P_FECHA_HORA,
+        
     } = req.body;
 
-    try {
-        await promisePool.query("CALL UPD_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?,?)", [
-            P_ID_ANUNCIOS_EVENTOS,
-            P_ID_ESTADO_ANUNCIO_EVENTO,
-            P_TITULO,
-            P_DESCRIPCION,
-            P_IMAGEN,
-            P_FECHA_HORA,
-        ]);
-        res.send("Actualizado correctamente !!");
-    } catch (err) {
-        console.error('Error ejecutando la actualización:', err);
-        res.status(500).send('Error ejecutando la actualización.');
-    }
-});
+    pool.query("CALL UPD_TBL_ANUNCIOS_EVENTOS (?,?,?,?,?,?)", [  
+        P_ID_ANUNCIOS_EVENTOS,
+        P_ID_ESTADO_ANUNCIO_EVENTO,
+        P_TITULO,
+        P_DESCRIPCION,
+        P_IMAGEN,
+        P_FECHA_HORA,
+        
+    ], (err, rows, fields) => {
 
-// Iniciar el servidor
-app.listen(3000, () => console.log('API REST corriendo en el puerto: 3000'));
+        if (!err) {
+            res.send("Actualizado correctamente !!");
+        } else {
+            console.log(err);
+        }
+    });
+});
 
 //SELVIN 
 //  ***TABLA PERSONA ***
 
 //Select <-> Get PERSONAS con Procedimiento almacenado
 app.get('/SEL_PERSONA', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_PERSONA()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_PERSONA()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -139,7 +172,7 @@ app.post('/POST_PERSONA', (req, res) => {
         
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_PERSONA (?,?,?,?,?,?,?,?)", [ P_NOMBRE_PERSONA,
+    pool.query("CALL INS_TBL_PERSONA (?,?,?,?,?,?,?,?)", [ P_NOMBRE_PERSONA,
         P_DNI_PERSONA,
         P_ID_CONTACTO,
         P_ID_TIPO_PERSONA,
@@ -161,7 +194,7 @@ app.post('/POST_PERSONA', (req, res) => {
 app.post('/DEL_PERSONA', (req, res) => {
     const { P_ID_PERSONA } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_PERSONA(?)",
         [P_ID_PERSONA],
         (err, rows, fields) => {
@@ -198,7 +231,7 @@ app.post('/PUT_PERSONA', (req, res) => {
         P_ID_PADRE
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_PERSONA (?,?,?,?,?,?,?,?,?)", [ P_ID_PERSONA,
+    pool.query("CALL UPD_TBL_PERSONA (?,?,?,?,?,?,?,?,?)", [ P_ID_PERSONA,
         P_NOMBRE_PERSONA,
         P_DNI_PERSONA,
         P_ID_CONTACTO,
@@ -224,7 +257,7 @@ app.post('/PUT_PERSONA', (req, res) => {
 
 //Select <-> Get TIPO_PERSONAS con Procedimiento almacenado
 app.get('/SEL_TBL_TIPO_PERSONAS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_TIPO_PERSONAS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_TIPO_PERSONAS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -239,7 +272,7 @@ app.post('/POST_TBL_TIPO_PERSONAS', (req, res) => {
         P_DESCRIPCION,
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_TIPO_PERSONAS (?)", [
+    pool.query("CALL INS_TBL_TIPO_PERSONAS (?)", [
          P_DESCRIPCION,
         ], (err, rows, fields) => {
 
@@ -256,7 +289,7 @@ app.post('/POST_TBL_TIPO_PERSONAS', (req, res) => {
 app.post('/DEL_TBL_TIPO_PERSONAS', (req, res) => {
     const { P_ID_TIPO_PERSONA } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_TIPO_PERSONAS(?)",
         [P_ID_TIPO_PERSONA],
         (err, rows, fields) => {
@@ -285,7 +318,7 @@ app.post('/PUT_TBL_TIPO_PERSONAS', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_TIPO_PERSONAS (?,?)", [ P_ID_TIPO_PERSONA,
+    pool.query("CALL UPD_TBL_TIPO_PERSONAS (?,?)", [ P_ID_TIPO_PERSONA,
         P_DESCRIPCION,
     ], (err, rows, fields) => {
 
@@ -302,7 +335,7 @@ app.post('/PUT_TBL_TIPO_PERSONAS', (req, res) => {
 
 //Select <-> Get TBL_MS_ROLES con Procedimiento almacenado
 app.get('/SEL_TBL_MS_ROLES', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_MS_ROLES()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_MS_ROLES()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -318,7 +351,7 @@ app.post('/POST_TBL_MS_ROLES', (req, res) => {
         P_DESCRIPCION,
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_MS_ROLES (?,?)", [ P_ROL,
+    pool.query("CALL INS_TBL_MS_ROLES (?,?)", [ P_ROL,
         P_DESCRIPCION
     ], (err, rows, fields) => {
 
@@ -334,7 +367,7 @@ app.post('/POST_TBL_MS_ROLES', (req, res) => {
 app.post('/DEL_TBL_MS_ROLES', (req, res) => {
     const { P_ID_ROL } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_MS_ROLES(?)",
         [P_ID_ROL],
         (err, rows, fields) => {
@@ -365,7 +398,7 @@ app.post('/PUT_TBL_MS_ROLES', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_MS_ROLES (?,?,?)", [ P_ID_ROL,
+    pool.query("CALL UPD_TBL_MS_ROLES (?,?,?)", [ P_ID_ROL,
         P_ROL,
         P_DESCRIPCION,
     ], (err, rows, fields) => {
@@ -382,7 +415,7 @@ app.post('/PUT_TBL_MS_ROLES', (req, res) => {
 
 //Select <-> Get TBL_MS_HIS_CONTRASEÑA con Procedimiento almacenado
 app.get('/SEL_TBL_MS_HIS_CONTRASENA', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_MS_HIS_CONTRASEÑA()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_MS_HIS_CONTRASEÑA()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -398,7 +431,7 @@ app.post('/POST_TBL_MS_HIS_CONTRASENA', (req, res) => {
         P_CONTRASEÑA
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_MS_HIST_CONTRASEÑA (?,?)", [ P_ID_USUARIO,
+    pool.query("CALL INS_TBL_MS_HIST_CONTRASEÑA (?,?)", [ P_ID_USUARIO,
         P_CONTRASEÑA
     ], (err, rows, fields) => {
 
@@ -414,7 +447,7 @@ app.post('/POST_TBL_MS_HIS_CONTRASENA', (req, res) => {
 app.post('/DEL_TBL_MS_HIS_CONTRASENA', (req, res) => {
     const { P_ID_HIST } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_MS_HIST_CONTRASEÑA(?)",
         [P_ID_HIST],
         (err, rows, fields) => {
@@ -444,7 +477,7 @@ app.post('/PUT_TBL_MS_HIS_CONTRASENA', (req, res) => {
         P_CONTRASEÑA
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_MS_HIST_CONTRASEÑA (?,?,?)", [ P_ID_HIST,
+    pool.query("CALL UPD_TBL_MS_HIST_CONTRASEÑA (?,?,?)", [ P_ID_HIST,
         P_ID_USUARIO,
         P_CONTRASEÑA
     ], (err, rows, fields) => {
@@ -462,7 +495,7 @@ app.post('/PUT_TBL_MS_HIS_CONTRASENA', (req, res) => {
 
 //Select <-> Get RESERVAS con Procedimiento almacenado
 app.get('/SEL_TBL_RESERVAS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_RESERVAS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_RESERVAS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -481,7 +514,7 @@ app.post('/POST_TBL_RESERVAS', (req, res) => {
         P_HORA_FECHA
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_RESERVAS (?,?,?,?,?)", [ P_ID_PERSONA,
+    pool.query("CALL INS_TBL_RESERVAS (?,?,?,?,?)", [ P_ID_PERSONA,
         P_ID_INSTALACION,
         P_ID_ESTADO_RESERVA,
         P_TIPO_EVENTO,
@@ -500,7 +533,7 @@ app.post('/POST_TBL_RESERVAS', (req, res) => {
 app.post('/DEL_TBL_RESERVAS', (req, res) => {
     const { P_ID_RESERVA } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_RESERVAS(?)",
         [P_ID_RESERVA],
         (err, rows, fields) => {
@@ -533,7 +566,7 @@ app.post('/PUT_TBL_RESERVAS', (req, res) => {
         P_HORA_FECHA
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_RESERVAS (?,?,?,?,?,?)", [ P_ID_RESERVA,
+    pool.query("CALL UPD_TBL_RESERVAS (?,?,?,?,?,?)", [ P_ID_RESERVA,
         P_ID_PERSONA,
         P_ID_INSTALACION,
         P_ID_ESTADO_RESERVA,
@@ -555,7 +588,7 @@ app.post('/PUT_TBL_RESERVAS', (req, res) => {
 
 //Select <-> Get INSTALACIONES con Procedimiento almacenado
 app.get('/SEL_INSTALACIONES', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_INSTALACIONES()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_INSTALACIONES()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -573,7 +606,7 @@ app.post('/POST_INSTALACIONES', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_INSTALACION (?,?,?,?)", [ 
+    pool.query("CALL INS_TBL_INSTALACION (?,?,?,?)", [ 
         P_NOMBRE_INSTALACION,
         P_CAPACIDAD,
         P_PRECIO,
@@ -591,7 +624,7 @@ app.post('/POST_INSTALACIONES', (req, res) => {
 app.post('/DEL_INSTALACIONES', (req, res) => {
     const { P_ID_INSTALACION } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_INSTALACIONES(?)",
         [P_ID_INSTALACION],
         (err, rows, fields) => {
@@ -623,7 +656,7 @@ app.post('/PUT_INSTALACIONES', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_INSTALACIONES (?,?,?,?,?)", [ 
+    pool.query("CALL UPD_TBL_INSTALACIONES (?,?,?,?,?)", [ 
         P_ID_INSTALACION,
         P_NOMBRE_INSTALACION,
         P_CAPACIDAD,
@@ -643,7 +676,7 @@ app.post('/PUT_INSTALACIONES', (req, res) => {
 
 //Select <-> Get CONDOMINIOS con Procedimiento almacenado
 app.get('/SEL_CONDOMINIOS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_CONDOMINIOS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_CONDOMINIOS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -659,7 +692,7 @@ app.post('/POST_CONDOMINIOS', (req, res) => {
        P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_CONDOMINIO (?,?)", [ 
+    pool.query("CALL INS_TBL_CONDOMINIO (?,?)", [ 
         P_ID_TIPO_CONDOMINIO,
         P_DESCRIPCION
     ], (err, rows, fields) => {
@@ -676,7 +709,7 @@ app.post('/POST_CONDOMINIOS', (req, res) => {
 app.post('/DEL_CONDOMINIOS', (req, res) => {
     const { P_ID_CONDOMINIO } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_CONDOMINIOS(?)",
         [P_ID_CONDOMINIO],
         (err, rows, fields) => {
@@ -707,7 +740,7 @@ app.post('/PUT_CONDOMINIOS', (req, res) => {
 
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_CONDOMINIOS (?,?,?)", [ 
+    pool.query("CALL UPD_TBL_CONDOMINIOS (?,?,?)", [ 
         P_ID_CONDOMINIO,
         P_ID_TIPO_CONDOMINIO,
         P_DESCRIPCION
@@ -725,7 +758,7 @@ app.post('/PUT_CONDOMINIOS', (req, res) => {
 
 //Select <-> Get PARENTESCOS con Procedimiento almacenado
 app.get('/SEL_PARENTESCOS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_PARENTESCOS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_PARENTESCOS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -740,7 +773,7 @@ app.post('/POST_PARENTESCOS', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_PARENTESCOS (?)", [ 
+    pool.query("CALL INS_TBL_PARENTESCOS (?)", [ 
         P_DESCRIPCION],
          (err, rows, fields) => {
 
@@ -756,7 +789,7 @@ app.post('/POST_PARENTESCOS', (req, res) => {
 app.post('/DEL_TBL_PARENTESCOS', (req, res) => {
     const { P_ID_PARENTESCO } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_PARENTESCOS(?)",
         [P_ID_PARENTESCO],
         (err, rows, fields) => {
@@ -785,7 +818,7 @@ app.post('/PUT_PARENTESCOS', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_PARENTESCOS (?,?)", [ 
+    pool.query("CALL UPD_TBL_PARENTESCOS (?,?)", [ 
         P_ID_PARENTESCO,
         P_DESCRIPCION
     ], (err, rows, fields) => {
@@ -802,7 +835,7 @@ app.post('/PUT_PARENTESCOS', (req, res) => {
 
 //Select <-> Get VISITANTES_RECURRENTES con Procedimiento almacenado
 app.get('/SEL_VISITANTES_RECURRENTES', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_VISITANTES_RECURRENTES()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_VISITANTES_RECURRENTES()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -824,7 +857,7 @@ app.post('/POST_VISITANTES_RECURRENTES', (req, res) => {
       
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_VISITANTES_RECURRENTES (?,?,?,?,?,?,?)", [ 
+    pool.query("CALL INS_TBL_VISITANTES_RECURRENTES (?,?,?,?,?,?,?)", [ 
         P_ID_PERSONA,
         P_NOMBRE_VISITANTE,
         P_DNI_VISITANTE,
@@ -847,7 +880,7 @@ app.post('/POST_VISITANTES_RECURRENTES', (req, res) => {
 app.post('/DEL_VISITANTES_RECURRENTES', (req, res) => {
     const { P_ID_VISITANTES_RECURRENTES } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_VISITANTES_RECURRENTES(?)",
         [P_ID_VISITANTES_RECURRENTES],
         (err, rows, fields) => {
@@ -883,7 +916,7 @@ app.post('/PUT_VISITANTES_RECURRENTES', (req, res) => {
 
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_VISITANTES_RECURRENTES (?,?,?,?,?,?,?,?)", [ 
+    pool.query("CALL UPD_TBL_VISITANTES_RECURRENTES (?,?,?,?,?,?,?,?)", [ 
         P_ID_VISITANTES_RECURRENTES,
         P_ID_PERSONA,
         P_NOMBRE_VISITANTE,
@@ -909,7 +942,7 @@ app.post('/PUT_VISITANTES_RECURRENTES', (req, res) => {
 
 //Select <-> Get ESTADO_RESERVA con Procedimiento almacenado
 app.get('/SEL_ESTADO_RESERVA', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_ESTADO_RESERVA()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_ESTADO_RESERVA()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -924,7 +957,7 @@ app.post('/POST_ESTADO_RESERVA', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_ESTADO_RESERVA (?)", [ 
+    pool.query("CALL INS_TBL_ESTADO_RESERVA (?)", [ 
         P_DESCRIPCION],
          (err, rows, fields) => {
 
@@ -940,7 +973,7 @@ app.post('/POST_ESTADO_RESERVA', (req, res) => {
 app.post('/DEL_ESTADO_RESERVA', (req, res) => {
     const { P_ID_ESTADO_RESERVA } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_ESTADO_RESERVA(?)",
         [P_ID_ESTADO_RESERVA],
         (err, rows, fields) => {
@@ -969,7 +1002,7 @@ app.post('/PUT_ESTADO_RESERVA', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_ESTADO_RESERVA (?,?)", [ 
+    pool.query("CALL UPD_TBL_ESTADO_RESERVA (?,?)", [ 
         P_ID_ESTADO_RESERVA,
         P_DESCRIPCION
     ], (err, rows, fields) => {
@@ -985,7 +1018,7 @@ app.post('/PUT_ESTADO_RESERVA', (req, res) => {
 
 //Select <-> Get TBL_MS_BITACORA con Procedimiento almacenado
 app.get('/SEL_TBL_MS_BITACORA', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_MS_BITACORA()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_MS_BITACORA()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1003,7 +1036,7 @@ app.post('/POST_TBL_MS_BITACORA', (req, res) => {
     P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_MS_BITACORA (?,?,?,?)", [ 
+    pool.query("CALL INS_TBL_MS_BITACORA (?,?,?,?)", [ 
         P_ID_USUARIO,
         P_ID_OBJETO,
         P_ACCION,
@@ -1022,7 +1055,7 @@ app.post('/POST_TBL_MS_BITACORA', (req, res) => {
 app.post('/DEL_TBL_MS_BITACORA', (req, res) => {
     const { P_ID_BITACORA } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_MS_BITACORA(?)",
         [P_ID_BITACORA],
         (err, rows, fields) => {
@@ -1055,7 +1088,7 @@ app.post('/PUT_TBL_MS_BITACORA', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_MS_BITACORA (?,?,?,?,?,?)", [ 
+    pool.query("CALL UPD_TBL_MS_BITACORA (?,?,?,?,?,?)", [ 
         P_ID_BITACORA,
         P_ID_USUARIO,
         P_ID_OBJETO,
@@ -1077,7 +1110,7 @@ app.post('/PUT_TBL_MS_BITACORA', (req, res) => {
 
 //Select <-> Get CONTACTOS con Procedimiento almacenado
 app.get('/SEL_CONTACTOS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_CONTACTOS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_CONTACTOS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1093,7 +1126,7 @@ app.post('/POST_CONTACTOS', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_CONTACTOS (?,?)", [P_ID_TIPO_CONTACTO,
+    pool.query("CALL INS_TBL_CONTACTOS (?,?)", [P_ID_TIPO_CONTACTO,
         P_DESCRIPCION], (err, rows, fields) => {
 
         if (!err) {
@@ -1109,7 +1142,7 @@ app.post('/POST_CONTACTOS', (req, res) => {
 app.post('/DEL_CONTACTOS', (req, res) => {
     const {P_ID_CONTACTO} = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_CONTACTOS(?)",
         [P_ID_CONTACTO],
         (err, rows, fields) => {
@@ -1139,7 +1172,7 @@ app.post('/PUT_CONTACTOS', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_CONTACTOS (?,?,?)", [P_ID_CONTACTO,
+    pool.query("CALL UPD_TBL_CONTACTOS (?,?,?)", [P_ID_CONTACTO,
 		P_ID_TIPO_CONTACTO,
         P_DESCRIPCION], (err, rows, fields) => {
 
@@ -1156,19 +1189,19 @@ app.post('/PUT_CONTACTOS', (req, res) => {
 
 //  ***TABLA USUARIO ***
 
-// Select <-> Get USUARIO con Procedimiento almacenado
-app.get('/SEL_USUARIO', async (req, res) => {
-    try {
-        const [rows, fields] = await promisePool.query('CALL SEL_TBL_MS_USUARIO()');
-        res.status(200).json(rows[0]);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error al obtener los usuarios.' });
-    }
+//Select <-> Get USUARIO con Procedimiento almacenado
+app.get('/SEL_USUARIO', (req, res) => {
+    pool.query('call SEL_TBL_MS_USUARIO()', (err, rows, fields) => {
+        if (!err) {
+            res.status(200).json(rows[0]);
+        } else {
+            console.log(err);
+        }
+    });
 });
 
-// Insertar a la tabla USUARIO
-app.post('/POST_USUARIO', async (req, res) => {
+// insertar a la tabla USUARIO
+app.post('/POST_USUARIO', (req, res) => {
     const {
         ID_ROL,
         NOMBRE_USUARIO,
@@ -1178,31 +1211,16 @@ app.post('/POST_USUARIO', async (req, res) => {
         PRIMER_INGRESO,
         FECHA_ULTIMA_CONEXION,
         FECHA_VENCIMIENTO,
+        google_id,
         google2fa_secret,
         INTENTOS_FALLIDOS,
         INTENTOS_FALLIDOS_OTP,
         ULTIMOS_INTENTOS_FALLIDOS
     } = req.body;
 
-    try {
-        const [result] = await promisePool.query(
-            "CALL INS_TBL_MS_USUARIO(?,?,?,?,?,?,?,?,?,?,?,?)", [
-                ID_ROL,
-                NOMBRE_USUARIO,
-                ID_ESTADO_USUARIO,
-                EMAIL,
-                CONTRASEÑA,
-                PRIMER_INGRESO,
-                FECHA_ULTIMA_CONEXION,
-                FECHA_VENCIMIENTO,
-                google2fa_secret,
-                INTENTOS_FALLIDOS,
-                INTENTOS_FALLIDOS_OTP,
-                ULTIMOS_INTENTOS_FALLIDOS
-            ]
-        );
-
-        const newUser = {
+    pool.query(
+        "CALL INS_TBL_MS_USUARIO(?,?,?,?,?,?,?,?,?,?,?,?)",
+        [
             ID_ROL,
             NOMBRE_USUARIO,
             ID_ESTADO_USUARIO,
@@ -1214,40 +1232,66 @@ app.post('/POST_USUARIO', async (req, res) => {
             google2fa_secret,
             INTENTOS_FALLIDOS,
             INTENTOS_FALLIDOS_OTP,
-            ULTIMOS_INTENTOS_FALLIDOS,
-            ID_USUARIO: result.insertId // O cualquier manera de obtener el ID_USUARIO creado
-        };
-
-        res.status(201).json(newUser);  // Envía la respuesta con los detalles del nuevo usuario
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Error al ingresar los datos del usuario." });
-    }
+            ULTIMOS_INTENTOS_FALLIDOS
+        ],
+        (err, filas, campos) => {
+            if (!err) {
+                // Define el objeto `newUser` con los datos del usuario recién creado
+                const newUser = {
+                    ID_ROL,
+                    NOMBRE_USUARIO,
+                    ID_ESTADO_USUARIO,
+                    EMAIL,
+                    CONTRASEÑA,
+                    PRIMER_INGRESO,
+                    FECHA_ULTIMA_CONEXION,
+                    FECHA_VENCIMIENTO,
+                    google2fa_secret,
+                    INTENTOS_FALLIDOS,
+                    INTENTOS_FALLIDOS_OTP,
+                    ULTIMOS_INTENTOS_FALLIDOS,
+                    ID_USUARIO: filas.insertId // O cualquier manera de obtener el ID_USUARIO creado
+                };
+                res.status(201).json(newUser);  // Envía la respuesta con los detalles del nuevo usuario
+            } else {
+                console.log(err);
+                res.status(500).send("Error al ingresar los datos");
+            }
+        }
+    );
 });
+
+
+
 
 // Borrar a la tabla USUARIO
-app.post('/DEL_USUARIO', async (req, res) => {
+app.post('/DEL_USUARIO', (req, res) => {
     const { P_ID_USUARIO } = req.body;
 
-    try {
-        const [rows, fields] = await promisePool.query("CALL DEL_TBL_MS_USUARIO(?)", [P_ID_USUARIO]);
-        res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
-    } catch (err) {
-        if (err.code === 'ER_ROW_IS_REFERENCED_2') {
-            res.status(400).json({
-                error: 'No se puede eliminar el Usuario porque está relacionado con otros registros.'
-            });
-        } else {
-            res.status(500).json({
-                error: 'Ocurrió un error al intentar eliminar el Usuario.'
-            });
+    pool.query(
+        "CALL DEL_TBL_MS_USUARIO(?)",
+        [P_ID_USUARIO],
+        (err, rows, fields) => {
+            if (!err) {
+                res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
+            } else {
+                if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+                    res.status(400).json({
+                        error: 'No se puede eliminar el Usuario porque está relacionado con otros registros.'
+                    });
+                } else {
+                    res.status(500).json({
+                        error: 'Ocurrió un error al intentar eliminar el Usuario.'
+                    });
+                }
+                console.log(err);
+            }
         }
-        console.error(err);
-    }
+    );
 });
 
-// Actualizar la tabla USUARIO
-app.post('/PUT_USUARIO', async (req, res) => {
+// ACTUALIZAR a la tabla USUARIO
+app.post('/PUT_USUARIO', (req, res) => {
     const {
         P_ID_USUARIO,
         P_ID_ROL,
@@ -1264,38 +1308,37 @@ app.post('/PUT_USUARIO', async (req, res) => {
         P_ULTIMOS_INTENTOS_FALLIDOS
     } = req.body;
 
-    try {
-        const [rows, fields] = await promisePool.query("CALL UPD_TBL_MS_USUARIO (?,?,?,?,?,?,?,?,?,?,?,?,?)", [
-            P_ID_USUARIO,
-            P_ID_ROL,
-            P_NOMBRE_USUARIO,
-            P_ID_ESTADO_USUARIO,
-            P_EMAIL,
-            P_CONTRASEÑA,
-            P_PRIMER_INGRESO,
-            P_FECHA_ULTIMA_CONEXION,
-            P_FECHA_VENCIMIENTO,
-            P_google2fa_secret,
-            P_INTENTOS_FALLIDOS,
-            P_INTENTOS_FALLIDOS_OTP,
-            P_ULTIMOS_INTENTOS_FALLIDOS
-        ]);
-
-        res.send("Actualizado correctamente !!");
-    } catch (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-            res.status(409).json({ message: 'El correo electrónico ingresado ya ha sido registrado.' });
+    pool.query("CALL UPD_TBL_MS_USUARIO (?,?,?,?,?,?,?,?,?,?,?,?,?)", [
+        P_ID_USUARIO,
+        P_ID_ROL,
+        P_NOMBRE_USUARIO,
+        P_ID_ESTADO_USUARIO,
+        P_EMAIL,
+        P_CONTRASEÑA,
+        P_PRIMER_INGRESO,
+        P_FECHA_ULTIMA_CONEXION,
+        P_FECHA_VENCIMIENTO,
+        P_google2fa_secret,
+        P_INTENTOS_FALLIDOS,
+        P_INTENTOS_FALLIDOS_OTP,
+        P_ULTIMOS_INTENTOS_FALLIDOS
+    ], (err, rows, fields) => {
+        if (!err) {
+            res.send("Actualizado correctamente !!");
         } else {
-            console.error(err);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ message: 'El correo electrónico ingresado ya ha sido registrado.' });
+            }
+            console.log(err);
             res.status(500).json({ message: 'Error al actualizar Usuario.' });
         }
-    }
+    });
 });
 
 
 //  ***TABLA TBL_PERMISOS ***
 app.get('/SEL_PERMISOS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_PERMISOS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_PERMISOS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1320,7 +1363,7 @@ app.post('/POST_PERMISOS', (req, res) => {
 	  P_MODIFICADO_POR
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_PERMISOS(?,?,?,?,?,?,?,?,?,?)", [
+    pool.query("CALL INS_TBL_PERMISOS(?,?,?,?,?,?,?,?,?,?)", [
 	  P_ID_ROL,
       P_ID_OBJETO,
 	  P_PERMISO_INSERCION,
@@ -1345,7 +1388,7 @@ app.post('/POST_PERMISOS', (req, res) => {
 app.post('/DEL_PERMISOS', (req, res) => {
     const {P_ID_PERMISO} = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_PERMISOS(?)",
         [P_ID_PERMISO],
         (err, rows, fields) => {
@@ -1384,7 +1427,7 @@ app.post('/PUT_PERMISOS', (req, res) => {
 	  P_MODIFICADO_POR
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_PERMISOS (?,?,?,?,?,?,?,?,?,?,?)", [
+    pool.query("CALL UPD_TBL_PERMISOS (?,?,?,?,?,?,?,?,?,?,?)", [
 	  P_ID_PERMISO,
 	  P_ID_ROL,
       P_ID_OBJETO,
@@ -1409,7 +1452,7 @@ app.post('/PUT_PERMISOS', (req, res) => {
 
 //  ***TABLA BITACORA_VISITA ***
 app.get('/SEL_BITACORA_VISITA', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_BITACORA_VISITA()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_BITACORA_VISITA()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1428,7 +1471,7 @@ app.post('/POST_BITACORA_VISITA', (req, res) => {
 		P_FECHA_HORA
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_BITACORA_VISITA(?,?,?,?,?)", [P_ID_PERSONA,
+    pool.query("CALL INS_TBL_BITACORA_VISITA(?,?,?,?,?)", [P_ID_PERSONA,
         P_ID_VISITANTE,
         P_NUM_PERSONA,
         P_NUM_PLACA,
@@ -1447,7 +1490,7 @@ app.post('/POST_BITACORA_VISITA', (req, res) => {
 app.post('/DEL_BITACORA_VISITA', (req, res) => {
     const {P_ID_BITACORA_VISITA} = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_BITACORA_VISITA(?)",
         [P_ID_BITACORA_VISITA],
         (err, rows, fields) => {
@@ -1481,7 +1524,7 @@ app.post('/PUT_BITACORA_VISITA', (req, res) => {
 		P_FECHA_HORA
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_BITACORA_VISITA (?,?,?,?,?,?)", [P_ID_BITACORA_VISITA,
+    pool.query("CALL UPD_TBL_BITACORA_VISITA (?,?,?,?,?,?)", [P_ID_BITACORA_VISITA,
 	    P_ID_PERSONA,
         P_ID_VISITANTE,
         P_NUM_PERSONA,
@@ -1501,7 +1544,7 @@ app.post('/PUT_BITACORA_VISITA', (req, res) => {
 
 //Select <-> Get ESTADO_PERSONA con Procedimiento almacenado
 app.get('/SEL_ESTADO_PERSONA', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_ESTADO_PERSONA()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_ESTADO_PERSONA()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1518,7 +1561,7 @@ app.post('/POST_ESTADO_PERSONA', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_ESTADO_PERSONA (?)", [ P_DESCRIPCION
+    pool.query("CALL INS_TBL_ESTADO_PERSONA (?)", [ P_DESCRIPCION
        ], (err, rows, fields) => {
 
         if (!err) {
@@ -1533,7 +1576,7 @@ app.post('/POST_ESTADO_PERSONA', (req, res) => {
 app.post('/DEL_ESTADO_PERSONA', (req, res) => {
     const { P_ID_ESTADO_PERSONA } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_ESTADO_PERSONA(?)",
         [P_ID_ESTADO_PERSONA],
         (err, rows, fields) => {
@@ -1563,7 +1606,7 @@ app.post('/PUT_ESTADO_PERSONA', (req, res) => {
 
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_ESTADO_PERSONA (?,?)", [ P_ID_ESTADO_PERSONA,
+    pool.query("CALL UPD_TBL_ESTADO_PERSONA (?,?)", [ P_ID_ESTADO_PERSONA,
         P_DESCRIPCION
         ], (err, rows, fields) => {
 
@@ -1582,7 +1625,7 @@ app.post('/PUT_ESTADO_PERSONA', (req, res) => {
 
 //Select <-> Get TBL_OBJETOS con Procedimiento almacenado
 app.get('/SEL_TBL_OBJETOS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_OBJETOS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_OBJETOS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1599,7 +1642,7 @@ app.post('/POST_TBL_OBJETOS', (req, res) => {
         P_TIPO_OBJETO
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_OBJETOS (?,?,?)", [ P_OBJETO, P_DESCRIPCION, P_TIPO_OBJETO
+    pool.query("CALL INS_TBL_OBJETOS (?,?,?)", [ P_OBJETO, P_DESCRIPCION, P_TIPO_OBJETO
        ], (err, rows, fields) => {
 
         if (!err) {
@@ -1615,7 +1658,7 @@ app.post('/POST_TBL_OBJETOS', (req, res) => {
 app.post('/DEL_TBL_OBJETOS', (req, res) => {
     const { P_ID_OBJETO } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_OBJETOS(?)",
         [P_ID_OBJETO],
         (err, rows, fields) => {
@@ -1647,7 +1690,7 @@ app.post('/PUT_TBL_OBJETOS', (req, res) => {
 
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_OBJETOS (?,?,?,?)", [ P_ID_OBJETO,
+    pool.query("CALL UPD_TBL_OBJETOS (?,?,?,?)", [ P_ID_OBJETO,
         P_OBJETO,P_DESCRIPCION,P_TIPO_OBJETO
         ], (err, rows, fields) => {
 
@@ -1663,7 +1706,7 @@ app.post('/PUT_TBL_OBJETOS', (req, res) => {
 
 //Select <-> Get REGVISITAS con Procedimiento almacenado
 app.get('/SEL_REGVISITAS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_REGVISITAS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_REGVISITAS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1683,7 +1726,7 @@ app.post('/POST_REGVISITAS', (req, res) => {
         P_FECHA_HORA
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_REGVISITAS (?,?,?,?,?,?)", [ 
+    pool.query("CALL INS_TBL_REGVISITAS (?,?,?,?,?,?)", [ 
         P_ID_PERSONA,
         P_NOMBRE_VISITANTE,
         P_DNI_VISITANTE,
@@ -1705,7 +1748,7 @@ app.post('/POST_REGVISITAS', (req, res) => {
 app.post('/DEL_REGVISITAS', (req, res) => {
     const { P_ID_VISITANTE } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_REGVISITAS(?)",
         [P_ID_VISITANTE],
         (err, rows, fields) => {
@@ -1740,7 +1783,7 @@ app.post('/PUT_REGVISITAS', (req, res) => {
 
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_REGVISITAS (?,?,?,?,?,?,?)", [ 
+    pool.query("CALL UPD_TBL_REGVISITAS (?,?,?,?,?,?,?)", [ 
         P_ID_VISITANTE,
         P_ID_PERSONA,
         P_NOMBRE_VISITANTE,
@@ -1762,7 +1805,7 @@ app.post('/PUT_REGVISITAS', (req, res) => {
 
 //Select <-> Get TBL_MS_ROLES_OBJETOS con Procedimiento almacenado
 app.get('/SEL_TBL_MS_ROLES_OBJETOS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_MS_ROLES_OBJETOS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_MS_ROLES_OBJETOS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1786,7 +1829,7 @@ app.post('/POST_TBL_MS_ROLES_OBJETOS', (req, res) => {
 	  P_PERMISO_CONSULTAR
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_MS_ROLES_OBJETOS (?,?,?,?,?,?,?,?,?)", [  P_ID_OBJETOS, P_PERMISO_INSERCION,
+    pool.query("CALL INS_TBL_MS_ROLES_OBJETOS (?,?,?,?,?,?,?,?,?)", [  P_ID_OBJETOS, P_PERMISO_INSERCION,
         P_PERMISO_ELIMINACION, P_PERMISO_ACTUALIZACION, P_FECHA_CREACION, P_CREADO_POR, P_FECHA_MODIFICACION, P_MODIFICADO_POR, P_PERMISO_CONSULTAR
        ], (err, rows, fields) => {
 
@@ -1802,7 +1845,7 @@ app.post('/POST_TBL_MS_ROLES_OBJETOS', (req, res) => {
 app.post('/DEL_TBL_MS_ROLES_OBJETOS', (req, res) => {
     const { P_ID_ROL } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_MS_ROLES_OBJETOS(?)",
         [P_ID_ROL],
         (err, rows, fields) => {
@@ -1839,7 +1882,7 @@ app.post('/PUT_TBL_MS_ROLES_OBJETOS', (req, res) => {
 	  P_PERMISO_CONSULTAR
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_MS_ROLES_OBJETOS (?,?,?,?,?,?,?,?,?,?)", [ P_ID_ROL,
+    pool.query("CALL UPD_TBL_MS_ROLES_OBJETOS (?,?,?,?,?,?,?,?,?,?)", [ P_ID_ROL,
         P_ID_OBJETOS,
         P_PERMISO_INSERCION,
         P_PERMISO_ELIMINACION,
@@ -1865,7 +1908,7 @@ app.post('/PUT_TBL_MS_ROLES_OBJETOS', (req, res) => {
 
 //Select <-> Get TIPO_CONTACTO con Procedimiento almacenado
 app.get('/SEL_TIPO_CONTACTO', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_TIPO_CONTACTO()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_TIPO_CONTACTO()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1880,7 +1923,7 @@ app.post('/POST_TIPO_CONTACTO', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_TIPO_CONTACTO (?)", [   
+    pool.query("CALL INS_TBL_TIPO_CONTACTO (?)", [   
         P_DESCRIPCION
 
     ], (err, rows, fields) => {
@@ -1897,7 +1940,7 @@ app.post('/POST_TIPO_CONTACTO', (req, res) => {
 app.post('/DEL_TIPO_CONTACTO', (req, res) => {
     const { P_ID_TIPO_CONTACTO } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_TIPO_CONTACTO(?)",
         [P_ID_TIPO_CONTACTO],
         (err, rows, fields) => {
@@ -1927,7 +1970,7 @@ app.post('/PUT_TIPO_CONTACTO', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_TIPO_CONTACTO (?,?)", [ 
+    pool.query("CALL UPD_TBL_TIPO_CONTACTO (?,?)", [ 
         P_ID_TIPO_CONTACTO,
         P_DESCRIPCION
     ], (err, rows, fields) => {
@@ -1950,7 +1993,7 @@ app.post('/PUT_TIPO_CONTACTO', (req, res) => {
 
 //Select <-> Get TIPO_CONDOMINIO con Procedimiento almacenado
 app.get('/SEL_TIPO_CONDOMINIO', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_TIPO_CONDOMINIO()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_TIPO_CONDOMINIO()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -1965,7 +2008,7 @@ app.post('/POST_TIPO_CONDOMINIO', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_TIPO_CONDOMINIO (?)", [   
+    pool.query("CALL INS_TBL_TIPO_CONDOMINIO (?)", [   
         P_DESCRIPCION
 
     ], (err, rows, fields) => {
@@ -1982,7 +2025,7 @@ app.post('/POST_TIPO_CONDOMINIO', (req, res) => {
 app.post('/DEL_TIPO_CONDOMINIO', (req, res) => {
     const { P_ID_TIPO_CONDOMINIO } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_TIPO_CONDOMINIO(?)",
         [P_ID_TIPO_CONDOMINIO],
         (err, rows, fields) => {
@@ -2012,7 +2055,7 @@ app.post('/PUT_TIPO_CONDOMINIO', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_TIPO_CONDOMINIO (?,?)", [ 
+    pool.query("CALL UPD_TBL_TIPO_CONDOMINIO (?,?)", [ 
         P_ID_TIPO_CONDOMINIO,
         P_DESCRIPCION
     ], (err, rows, fields) => {
@@ -2033,7 +2076,7 @@ app.post('/PUT_TIPO_CONDOMINIO', (req, res) => {
 
 //Select <-> Get ESTADO_USUARIO con Procedimiento almacenado
 app.get('/SEL_ESTADO_USUARIO', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_ESTADO_USUARIO()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_ESTADO_USUARIO()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -2048,7 +2091,7 @@ app.post('/POST_ESTADO_USUARIO', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_ESTADO_USUARIO (?)", [   
+    pool.query("CALL INS_TBL_ESTADO_USUARIO (?)", [   
         P_DESCRIPCION
 
     ], (err, rows, fields) => {
@@ -2065,7 +2108,7 @@ app.post('/POST_ESTADO_USUARIO', (req, res) => {
 app.post('/DEL_ESTADO_USUARIO', (req, res) => {
     const { P_ID_ESTADO_USUARIO } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_ESTADO_USUARIO(?)",
         [P_ID_ESTADO_USUARIO],
         (err, rows, fields) => {
@@ -2094,7 +2137,7 @@ app.post('/PUT_ESTADO_USUARIO', (req, res) => {
         P_DESCRIPCION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_ESTADO_USUARIO(?,?)", [ 
+    pool.query("CALL UPD_TBL_ESTADO_USUARIO(?,?)", [ 
         P_ID_ESTADO_USUARIO,
         P_DESCRIPCION
     ], (err, rows, fields) => {
@@ -2117,7 +2160,7 @@ app.post('/PUT_ESTADO_USUARIO', (req, res) => {
 
 //Select <-> Get TBL_MS_PARAMETROS con Procedimiento almacenado
 app.get('/SEL_TBL_MS_PARAMETROS', (req, res) => {
-    mysqlConnection.query('call SEL_TBL_MS_PARAMETROS()', (err, rows, fields) => {
+    pool.query('call SEL_TBL_MS_PARAMETROS()', (err, rows, fields) => {
         if (!err) {
             res.status(200).json(rows[0]);
         } else {
@@ -2136,7 +2179,7 @@ app.post('/POST_TBL_MS_PARAMETROS', (req, res) => {
         P_FECHA_MODIFICACION
     } = req.body;
 
-    mysqlConnection.query("CALL INS_TBL_MS_PARAMETROS (?,?,?,?,?)", [   
+    pool.query("CALL INS_TBL_MS_PARAMETROS (?,?,?,?,?)", [   
         P_ID_USUARIO,
         P_PARAMETRO,   
 		P_VALOR,
@@ -2157,7 +2200,7 @@ app.post('/POST_TBL_MS_PARAMETROS', (req, res) => {
 app.post('/DEL_TBL_MS_PARAMETROS', (req, res) => {
     const { P_ID_PARAMETRO } = req.body;
 
-    mysqlConnection.query(
+    pool.query(
         "CALL DEL_TBL_MS_PARAMETROS(?)",
         [P_ID_PARAMETRO],
         (err, rows, fields) => {
@@ -2193,7 +2236,7 @@ app.post('/PUT_TBL_MS_PARAMETROS', (req, res) => {
         P_FECHA_MODIFICACION
     } = req.body;
 
-    mysqlConnection.query("CALL UPD_TBL_MS_PARAMETROS(?,?,?,?,?,?)", [ 
+    pool.query("CALL UPD_TBL_MS_PARAMETROS(?,?,?,?,?,?)", [ 
         P_ID_PARAMETRO,
         P_ID_USUARIO,
         P_PARAMETRO,   
