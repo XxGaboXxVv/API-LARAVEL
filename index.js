@@ -242,11 +242,11 @@ app.post('/PUT_PERSONA', async (req, res) => {
 // Select <-> Get TIPO_PERSONAS con Procedimiento almacenado
 app.get('/SEL_TBL_TIPO_PERSONAS', async (req, res) => {
     try {
-        const rows = await queryAsync('CALL SEL_TBL_TIPO_PERSONAS()');
+        const [rows, fields] = await pool.query('CALL SEL_TBL_TIPO_PERSONAS()');
         res.status(200).json(rows[0]);
     } catch (err) {
         console.log(err);
-        res.status(500).json({ error: 'Ocurrió un error al obtener los tipos de personas.' });
+        res.status(500).send("Error ejecutando la consulta.");
     }
 });
 
@@ -255,11 +255,21 @@ app.post('/POST_TBL_TIPO_PERSONAS', async (req, res) => {
     const { P_DESCRIPCION } = req.body;
 
     try {
-        await queryAsync('CALL INS_TBL_TIPO_PERSONAS(?)', [P_DESCRIPCION]);
-        res.send('Ingresado correctamente !!');
+        const [rows, fields] = await pool.query(
+            "CALL INS_TBL_TIPO_PERSONAS(?)",
+            [P_DESCRIPCION]
+        );
+
+        // Define el objeto `newTipoPersona` con los datos del tipo de persona recién creado
+        const newTipoPersona = {
+            P_DESCRIPCION,
+            ID_TIPO_PERSONA: rows.insertId // O cualquier manera de obtener el ID_TIPO_PERSONA creado
+        };
+
+        res.status(201).json(newTipoPersona);  // Envía la respuesta con los detalles del nuevo tipo de persona
     } catch (err) {
         console.log(err);
-        res.status(500).json({ error: 'Ocurrió un error al insertar el tipo de persona.' });
+        res.status(500).send("Error al ingresar los datos");
     }
 });
 
@@ -268,10 +278,13 @@ app.post('/DEL_TBL_TIPO_PERSONAS', async (req, res) => {
     const { P_ID_TIPO_PERSONA } = req.body;
 
     try {
-        await queryAsync('CALL DEL_TBL_TIPO_PERSONAS(?)', [P_ID_TIPO_PERSONA]);
+        await pool.query(
+            "CALL DEL_TBL_TIPO_PERSONAS(?)",
+            [P_ID_TIPO_PERSONA]
+        );
+
         res.status(200).json({ message: 'El registro se eliminó exitosamente.' });
     } catch (err) {
-        console.log(err);
         if (err.code === 'ER_ROW_IS_REFERENCED_2') {
             res.status(400).json({
                 error: 'No se puede eliminar el Tipo de Persona porque está relacionado con otros registros.'
@@ -281,6 +294,7 @@ app.post('/DEL_TBL_TIPO_PERSONAS', async (req, res) => {
                 error: 'Ocurrió un error al intentar eliminar el Tipo de Persona.'
             });
         }
+        console.log(err);
     }
 });
 
@@ -289,13 +303,21 @@ app.post('/PUT_TBL_TIPO_PERSONAS', async (req, res) => {
     const { P_ID_TIPO_PERSONA, P_DESCRIPCION } = req.body;
 
     try {
-        await queryAsync('CALL UPD_TBL_TIPO_PERSONAS(?, ?)', [P_ID_TIPO_PERSONA, P_DESCRIPCION]);
-        res.send('Actualizado correctamente !!');
+        await pool.query(
+            "CALL UPD_TBL_TIPO_PERSONAS(?, ?)",
+            [P_ID_TIPO_PERSONA, P_DESCRIPCION]
+        );
+
+        res.send("Actualizado correctamente !!");
     } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ message: 'El tipo de persona ya existe.' });
+        }
         console.log(err);
-        res.status(500).json({ error: 'Ocurrió un error al actualizar el tipo de persona.' });
+        res.status(500).json({ message: 'Error al actualizar el tipo de persona.' });
     }
 });
+
 
 
 //  ***TABLA TBL_MS_ROLES ***
