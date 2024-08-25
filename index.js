@@ -8,11 +8,11 @@ var app = express();
 app.use(bp.json());
 
 var mysqlConnection = mysql.createConnection({
-    host: 'junction.proxy.rlwy.net',
-    user: 'root',
-    password: 'KIrqtUpHbSvuQinLjxJIVrlxFZCqqxnl',
-    database: 'railway',
-    port: 17751,
+    host: '127.0.0.1',
+    user: 'u729991132_root',
+    password: 'Dragonb@ll2',
+    database: 'u729991132_railway',
+    port: 3306,
     multipleStatements: true
 });
 
