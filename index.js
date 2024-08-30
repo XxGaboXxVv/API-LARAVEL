@@ -1149,7 +1149,7 @@ app.get('/SEL_USUARIO', async (req, res) => {
     const search = req.query.search || '';
 
     try {
-        const [rows] = await pool.query('CALL SEL_TBL_MS_USUARIO(?, ?, ?)', [start, length, search]);
+        const [rows,fields] = await pool.query('CALL SEL_TBL_MS_USUARIO(?, ?, ?)', [start, length, search]);
         res.status(200).json(rows);
     } catch (err) {
         console.error(err);
