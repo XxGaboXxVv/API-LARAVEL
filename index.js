@@ -1144,17 +1144,6 @@ app.post('/PUT_CONTACTOS', async (req, res) => {
 //  ***TABLA USUARIO ***
 //Select <-> Get USUARIO con Procedimiento almacenado
 app.get('/SEL_USUARIO', async (req, res) => {
-    try {
-        const [rows, fields] = await pool.query('CALL SEL_TBL_MS_USUARIO()');
-        res.status(200).json(rows[0]);
-    } catch (err) {
-        console.log(err);
-        res.status(500).send("Error ejecutando la consulta.");
-    }
-});
-//Select <-> Get USUARIO FILTRADO con Procedimiento almacenado
-
-app.get('/SEL_USUARIO/FILTRADO', async (req, res) => {
     const start = parseInt(req.query.start) || 0;
     const length = parseInt(req.query.length) || 10;
     const search = req.query.search || '';
@@ -1167,8 +1156,6 @@ app.get('/SEL_USUARIO/FILTRADO', async (req, res) => {
         res.status(500).send("Error ejecutando la consulta.");
     }
 });
-
-
 
 
 // insertar a la tabla USUARIO
