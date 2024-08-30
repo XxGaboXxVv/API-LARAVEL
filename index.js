@@ -1145,7 +1145,7 @@ app.post('/PUT_CONTACTOS', async (req, res) => {
 //Select <-> Get USUARIO con Procedimiento almacenado
 app.get('/SEL_USUARIO', async (req, res) => {
     const start = parseInt(req.query.start) || 0;
-    const length = parseInt(req.query.length) || 10;
+    const length = parseInt(req.query.length) || 500;
     const search = req.query.search || '';
 
     try {
