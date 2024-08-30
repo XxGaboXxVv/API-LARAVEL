@@ -1142,8 +1142,7 @@ app.post('/PUT_CONTACTOS', async (req, res) => {
 
 
 //  ***TABLA USUARIO ***
-
-}); //Select <-> Get USUARIO con Procedimiento almacenado
+ //Select <-> Get USUARIO con Procedimiento almacenado
 app.get('/SEL_USUARIO', async (req, res) => {
     try {
         const [rows, fields] = await pool.query('CALL SEL_TBL_MS_USUARIO()');
