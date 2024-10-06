@@ -11,8 +11,8 @@ app.use(bp.json());
 const pool = mysql.createPool({
 
      host:'3.141.17.104',
-    user:'root',
-    password:'codemasters',
+    user:'code',
+    password:'prueba',
     database:'railway',
     port:3306,
     multipleStatements: true
