@@ -10,9 +10,9 @@ app.use(bp.json());
 
 const pool = mysql.createPool({
 
-     host:'138.94.121.142',
+     host:'autorack.proxy.rlwy.net',
     user:'root',
-    password:'password',
+    password:'MsvxEdgFXjZZipZbJElYCXInyDJcwqdE',
     database:'railway',
     port:3306,
     multipleStatements: true
