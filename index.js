@@ -10,7 +10,7 @@ app.use(bp.json());
 
 const pool = mysql.createPool({
 
-     host:'127.0.0.1',
+     host:'138.94.121.142',
     user:'root',
     password:'password',
     database:'railway',
