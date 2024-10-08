@@ -14,7 +14,7 @@ const pool = mysql.createPool({
     user:'root',
     password:'MsvxEdgFXjZZipZbJElYCXInyDJcwqdE',
     database:'railway',
-    port:3306,
+    port:52007,
     multipleStatements: true
 });
 
