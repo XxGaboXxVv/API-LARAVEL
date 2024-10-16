@@ -10,11 +10,11 @@ app.use(bp.json());
 
 const pool = mysql.createPool({
 
-     host:'autorack.proxy.rlwy.net',
-    user:'root',
-    password:'MsvxEdgFXjZZipZbJElYCXInyDJcwqdE',
-    database:'railway',
-    port:52007,
+     host:'82.197.82.66',
+    user:'u995289331_root',
+    password:'CodeM@sters123',
+    database:'u995289331_railway',
+    port:3306,
     multipleStatements: true
 });
 
