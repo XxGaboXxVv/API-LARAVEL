@@ -735,7 +735,7 @@ app.post('/PUT_CONDOMINIOS', async (req, res) => {
         P_ID_CONDOMINIO,
         P_ID_TIPO_CONDOMINIO,
         P_DESCRIPCION,
-         P_USUARIOS_POR_CASA
+     P_USUARIOS_POR_CASA
     } = req.body;
 
     try {
