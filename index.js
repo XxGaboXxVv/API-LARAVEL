@@ -691,13 +691,15 @@ app.get('/SEL_CONDOMINIOS', async (req, res) => {
 app.post('/POST_CONDOMINIOS', async (req, res) => {
     const {
         P_ID_TIPO_CONDOMINIO,
-        P_DESCRIPCION
+        P_DESCRIPCION,
+     P_USUARIOS_POR_CASA
     } = req.body;
 
     try {
-        await pool.query("CALL INS_TBL_CONDOMINIO (?,?)", [ 
+        await pool.query("CALL INS_TBL_CONDOMINIO (?,?,?)", [ 
             P_ID_TIPO_CONDOMINIO,
-            P_DESCRIPCION
+            P_DESCRIPCION,
+               P_USUARIOS_POR_CASA
         ]);
         res.send("Ingresado correctamente !!");
     } catch (err) {
@@ -732,14 +734,16 @@ app.post('/PUT_CONDOMINIOS', async (req, res) => {
     const {
         P_ID_CONDOMINIO,
         P_ID_TIPO_CONDOMINIO,
-        P_DESCRIPCION
+        P_DESCRIPCION,
+         P_USUARIOS_POR_CASA
     } = req.body;
 
     try {
-        await pool.query("CALL UPD_TBL_CONDOMINIOS (?,?,?)", [ 
+        await pool.query("CALL UPD_TBL_CONDOMINIOS (?,?,?,?)", [ 
             P_ID_CONDOMINIO,
             P_ID_TIPO_CONDOMINIO,
-            P_DESCRIPCION
+            P_DESCRIPCION,
+             P_USUARIOS_POR_CASA
         ]);
         res.send("Actualizado correctamente !!");
     } catch (err) {
