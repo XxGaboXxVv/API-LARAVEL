@@ -692,14 +692,14 @@ app.post('/POST_CONDOMINIOS', async (req, res) => {
     const {
         P_ID_TIPO_CONDOMINIO,
         P_DESCRIPCION,
-     P_USUARIOS_POR_CASA
+        P_USUARIOS_POR_CASA
     } = req.body;
 
     try {
         await pool.query("CALL INS_TBL_CONDOMINIO (?,?,?)", [ 
             P_ID_TIPO_CONDOMINIO,
             P_DESCRIPCION,
-               P_USUARIOS_POR_CASA
+            P_USUARIOS_POR_CASA
         ]);
         res.send("Ingresado correctamente !!");
     } catch (err) {
@@ -735,7 +735,7 @@ app.post('/PUT_CONDOMINIOS', async (req, res) => {
         P_ID_CONDOMINIO,
         P_ID_TIPO_CONDOMINIO,
         P_DESCRIPCION,
-     P_USUARIOS_POR_CASA
+          P_USUARIOS_POR_CASA
     } = req.body;
 
     try {
