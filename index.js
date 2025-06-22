@@ -842,17 +842,19 @@ app.post('/POST_VISITANTES_RECURRENTES', async (req, res) => {
         P_NUM_PERSONAS,
         P_NUM_PLACA,
         P_FECHA_HORA,
+          P_FECHA_ACCESO,
         P_FECHA_VENCIMIENTO
     } = req.body;
 
     try {
-        await pool.query("CALL INS_TBL_VISITANTES_RECURRENTES (?, ?, ?, ?, ?, ?, ?)", [ 
+        await pool.query("CALL INS_TBL_VISITANTES_RECURRENTES (?, ?, ?, ?, ?, ?, ?,?)", [ 
             P_ID_PERSONA,
             P_NOMBRE_VISITANTE,
             P_DNI_VISITANTE,
             P_NUM_PERSONAS,
             P_NUM_PLACA,
             P_FECHA_HORA,
+             P_FECHA_ACCESO,
             P_FECHA_VENCIMIENTO
         ]);
         res.send("Ingresado correctamente !!");
@@ -893,11 +895,12 @@ app.post('/PUT_VISITANTES_RECURRENTES', async (req, res) => {
         P_NUM_PERSONAS,
         P_NUM_PLACA,
         P_FECHA_HORA,
+          P_FECHA_ACCESO,
         P_FECHA_VENCIMIENTO
     } = req.body;
 
     try {
-        await pool.query("CALL UPD_TBL_VISITANTES_RECURRENTES (?, ?, ?, ?, ?, ?, ?, ?)", [ 
+        await pool.query("CALL UPD_TBL_VISITANTES_RECURRENTES (?, ?, ?, ?, ?, ?, ?, ?,?)", [ 
             P_ID_VISITANTES_RECURRENTES,
             P_ID_PERSONA,
             P_NOMBRE_VISITANTE,
@@ -905,6 +908,7 @@ app.post('/PUT_VISITANTES_RECURRENTES', async (req, res) => {
             P_NUM_PERSONAS,
             P_NUM_PLACA,
             P_FECHA_HORA,
+             P_FECHA_ACCESO,
             P_FECHA_VENCIMIENTO
         ]);
         res.send("Actualizado correctamente !!");
@@ -1422,16 +1426,18 @@ app.post('/POST_BITACORA_VISITA', async (req, res) => {
         P_ID_VISITANTE,
         P_NUM_PERSONA,
         P_NUM_PLACA,
-        P_FECHA_HORA
+        P_FECHA_HORA,
+         P_FECHA_ACCESO
     } = req.body;
 
     try {
-        await pool.query("CALL INS_TBL_BITACORA_VISITA(?,?,?,?,?)", [
+        await pool.query("CALL INS_TBL_BITACORA_VISITA(?,?,?,?,?,?)", [
             P_ID_PERSONA,
             P_ID_VISITANTE,
             P_NUM_PERSONA,
             P_NUM_PLACA,
-            P_FECHA_HORA
+            P_FECHA_HORA,
+             P_FECHA_ACCESO
         ]);
         res.send("Ingresado correctamente !!");
     } catch (err) {
@@ -1469,17 +1475,19 @@ app.post('/PUT_BITACORA_VISITA', async (req, res) => {
         P_ID_VISITANTE,
         P_NUM_PERSONA,
         P_NUM_PLACA,
-        P_FECHA_HORA
+        P_FECHA_HORA,
+     P_FECHA_ACCESO
     } = req.body;
 
     try {
-        await pool.query("CALL UPD_TBL_BITACORA_VISITA (?,?,?,?,?,?)", [
+        await pool.query("CALL UPD_TBL_BITACORA_VISITA (?,?,?,?,?,?,?)", [
             P_ID_BITACORA_VISITA,
             P_ID_PERSONA,
             P_ID_VISITANTE,
             P_NUM_PERSONA,
             P_NUM_PLACA,
-            P_FECHA_HORA
+            P_FECHA_HORA,
+             P_FECHA_ACCESO
         ]);
         res.send("Actualizado correctamente !!");
     } catch (err) {
@@ -1643,17 +1651,20 @@ app.post('/POST_REGVISITAS', async (req, res) => {
         P_DNI_VISITANTE,
         P_NUM_PERSONAS,
         P_NUM_PLACA,
-        P_FECHA_HORA
+        P_FECHA_HORA,
+        P_FECHA_ACCESO 
+         
     } = req.body;
 
     try {
-        await pool.query("CALL INS_TBL_REGVISITAS (?,?,?,?,?,?)", [ 
+        await pool.query("CALL INS_TBL_REGVISITAS (?,?,?,?,?,?,?)", [ 
             P_ID_PERSONA,
             P_NOMBRE_VISITANTE,
             P_DNI_VISITANTE,
             P_NUM_PERSONAS,
             P_NUM_PLACA,
-            P_FECHA_HORA
+            P_FECHA_HORA,
+          P_FECHA_ACCESO
         ]);
         res.send("Ingresado correctamente !!");
     } catch (err) {
@@ -1692,18 +1703,20 @@ app.post('/PUT_REGVISITAS', async (req, res) => {
         P_DNI_VISITANTE,
         P_NUM_PERSONAS,
         P_NUM_PLACA,
-        P_FECHA_HORA
+        P_FECHA_HORA,
+        P_FECHA_ACCESO 
     } = req.body;
 
     try {
-        await pool.query("CALL UPD_TBL_REGVISITAS (?,?,?,?,?,?,?)", [ 
+        await pool.query("CALL UPD_TBL_REGVISITAS (?,?,?,?,?,?,?,?)", [ 
             P_ID_VISITANTE,
             P_ID_PERSONA,
             P_NOMBRE_VISITANTE,
             P_DNI_VISITANTE,
             P_NUM_PERSONAS,
             P_NUM_PLACA,
-            P_FECHA_HORA
+            P_FECHA_HORA,
+          P_FECHA_ACCESO
         ]);
         res.send("Actualizado correctamente !!");
     } catch (err) {
