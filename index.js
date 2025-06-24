@@ -10,12 +10,15 @@ app.use(bp.json());
 
 const pool = mysql.createPool({
 
-     host:'31.170.167.204',
-    user:'u569522830_codemasters408',
-    password:'Codem@sters123',
-    database:'u569522830_lasacacias',
-    port:3306,
-    multipleStatements: true
+  host:'31.170.167.204',
+     user:'u569522830_codemasters408',
+     password:'Codem@sters123',
+     database:'u569522830_lasacacias',
+     port:3306,
+    waitForConnections: true,       // Espera si se supera el límite
+    connectionLimit: 20,            // ✅ MÁXIMO 10 conexiones simultáneas
+    queueLimit: 0,                  // Sin límite en cola de espera
+    idleTimeout: 60000              // Desconecta si está inactiva 60 segundos
 });
 
 
