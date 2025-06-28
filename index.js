@@ -241,12 +241,13 @@ app.post('/PUT_PERSONA', async (req, res) => {
 
     try {
         await pool.query(
-            "CALL UPD_TBL_PERSONA(?,?,?,?,?,?,?,?,?,?)",
+            "CALL UPD_TBL_PERSONA(?,?,?,?,?,?,?,?,?,?,?)",
             [
                 P_ID_PERSONA,
                 P_NOMBRE_PERSONA,
                 P_ID_NACIONALIDAD,
                 P_DNI_PERSONA,
+                P_NUM_CARNET_EXTRANJERO,
                 P_ID_CONTACTO,
                 P_ID_TIPO_PERSONA,
                 P_ID_ESTADO_PERSONA,
