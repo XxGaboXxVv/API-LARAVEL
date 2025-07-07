@@ -897,24 +897,28 @@ app.post('/PUT_VISITANTES_RECURRENTES', async (req, res) => {
         P_ID_VISITANTES_RECURRENTES,
         P_ID_PERSONA,
         P_NOMBRE_VISITANTE,
+        P_ID_NACIONALIDAD,
         P_DNI_VISITANTE,
+        P_NUM_CARNET_EXTRANJERO,
         P_NUM_PERSONAS,
         P_NUM_PLACA,
         P_FECHA_HORA,
-          P_FECHA_ACCESO,
+        P_FECHA_ACCESO,
         P_FECHA_VENCIMIENTO
     } = req.body;
 
     try {
-        await pool.query("CALL UPD_TBL_VISITANTES_RECURRENTES (?, ?, ?, ?, ?, ?, ?, ?,?)", [ 
+        await pool.query("CALL UPD_TBL_VISITANTES_RECURRENTES (?,?,?,?,?,?,?,?,?,?,?)", [ 
             P_ID_VISITANTES_RECURRENTES,
             P_ID_PERSONA,
             P_NOMBRE_VISITANTE,
+            P_ID_NACIONALIDAD,
             P_DNI_VISITANTE,
+            P_NUM_CARNET_EXTRANJERO,
             P_NUM_PERSONAS,
             P_NUM_PLACA,
             P_FECHA_HORA,
-             P_FECHA_ACCESO,
+            P_FECHA_ACCESO,
             P_FECHA_VENCIMIENTO
         ]);
         res.send("Actualizado correctamente !!");
@@ -1705,8 +1709,10 @@ app.post('/PUT_REGVISITAS', async (req, res) => {
     const {
         P_ID_VISITANTE,
         P_ID_PERSONA,
+        P_ID_NACIONALIDAD,
         P_NOMBRE_VISITANTE,
         P_DNI_VISITANTE,
+        P_NUM_CARNET_EXTRANJERO,
         P_NUM_PERSONAS,
         P_NUM_PLACA,
         P_FECHA_HORA,
@@ -1714,11 +1720,13 @@ app.post('/PUT_REGVISITAS', async (req, res) => {
     } = req.body;
 
     try {
-        await pool.query("CALL UPD_TBL_REGVISITAS (?,?,?,?,?,?,?,?)", [ 
+        await pool.query("CALL UPD_TBL_REGVISITAS (?,?,?,?,?,?,?,?,?,?)", [ 
             P_ID_VISITANTE,
             P_ID_PERSONA,
+            P_ID_NACIONALIDAD,
             P_NOMBRE_VISITANTE,
             P_DNI_VISITANTE,
+            P_NUM_CARNET_EXTRANJERO,
             P_NUM_PERSONAS,
             P_NUM_PLACA,
             P_FECHA_HORA,
